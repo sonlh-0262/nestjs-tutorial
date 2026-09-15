@@ -13,7 +13,7 @@ import { AppService } from './app.service';
 import { LANGUAGE_FALLBACKS } from './common/constants/languages';
 import { AcceptLanguageAliasResolver } from './common/resolvers/accept-language-alias.resolver';
 import configuration, { AppConfig } from './config/configuration';
-import { validateEnv } from './config/env.validation';
+import { envValidationSchema } from './config/env.validation';
 
 @Module({
   imports: [
@@ -21,7 +21,8 @@ import { validateEnv } from './config/env.validation';
       isGlobal: true,
       cache: true,
       load: [configuration],
-      validate: validateEnv,
+      validationSchema: envValidationSchema,
+      validationOptions: { abortEarly: false },
       envFilePath: ['.env.local', '.env'],
     }),
     I18nModule.forRootAsync({

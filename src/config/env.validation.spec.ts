@@ -1,17 +1,24 @@
-import { validateEnv } from './env.validation';
+import { envValidationSchema } from './env.validation';
 
-describe('validateEnv', () => {
+const validate = (env: Record<string, unknown>) =>
+  envValidationSchema.validate(env, { abortEarly: false });
+
+describe('envValidationSchema', () => {
   it('accepts an empty environment (every variable has a default)', () => {
-    expect(() => validateEnv({})).not.toThrow();
+    expect(validate({}).error).toBeUndefined();
   });
 
   it('coerces PORT to a number', () => {
-    expect(validateEnv({ PORT: '3000' }).PORT).toBe(3000);
+    const result = validate({ PORT: '3000' });
+    if (result.error) {
+      throw result.error;
+    }
+    expect(result.value.PORT).toBe(3000);
   });
 
   it('accepts a full, valid environment', () => {
-    expect(() =>
-      validateEnv({
+    expect(
+      validate({
         NODE_ENV: 'production',
         PORT: '8080',
         APP_NAME: 'API',
@@ -19,53 +26,41 @@ describe('validateEnv', () => {
         FALLBACK_LANGUAGE: 'jp',
         SWAGGER_PATH: 'docs',
         SWAGGER_ENABLED: 'false',
-      }),
-    ).not.toThrow();
+      }).error,
+    ).toBeUndefined();
   });
 
   it('ignores variables it does not know about', () => {
-    expect(() => validateEnv({ SOME_OTHER_TOOL: 'whatever' })).not.toThrow();
+    expect(validate({ SOME_OTHER_TOOL: 'whatever' }).error).toBeUndefined();
   });
 
   it('rejects an unknown NODE_ENV', () => {
-    expect(() => validateEnv({ NODE_ENV: 'staging' })).toThrow(
-      /Invalid environment variables/,
-    );
+    expect(validate({ NODE_ENV: 'staging' }).error).toBeDefined();
   });
 
   it('rejects a non-numeric PORT', () => {
-    expect(() => validateEnv({ PORT: 'not-a-port' })).toThrow(
-      /Invalid environment variables/,
-    );
+    expect(validate({ PORT: 'not-a-port' }).error).toBeDefined();
   });
 
   it('rejects an out-of-range PORT', () => {
-    expect(() => validateEnv({ PORT: '70000' })).toThrow(
-      /Invalid environment variables/,
-    );
+    expect(validate({ PORT: '70000' }).error).toBeDefined();
   });
 
   it('rejects a non-boolean SWAGGER_ENABLED', () => {
-    expect(() => validateEnv({ SWAGGER_ENABLED: 'yes' })).toThrow(
-      /Invalid environment variables/,
-    );
+    expect(validate({ SWAGGER_ENABLED: 'yes' }).error).toBeDefined();
   });
 
   it('accepts each supported FALLBACK_LANGUAGE', () => {
-    expect(() => validateEnv({ FALLBACK_LANGUAGE: 'en' })).not.toThrow();
-    expect(() => validateEnv({ FALLBACK_LANGUAGE: 'jp' })).not.toThrow();
+    expect(validate({ FALLBACK_LANGUAGE: 'en' }).error).toBeUndefined();
+    expect(validate({ FALLBACK_LANGUAGE: 'jp' }).error).toBeUndefined();
   });
 
   it('rejects a FALLBACK_LANGUAGE the app has no translations for', () => {
     // `vi` was dropped, so it must no longer be accepted.
-    expect(() => validateEnv({ FALLBACK_LANGUAGE: 'vi' })).toThrow(
-      /Invalid environment variables/,
-    );
+    expect(validate({ FALLBACK_LANGUAGE: 'vi' }).error).toBeDefined();
   });
 
   it('rejects an empty FALLBACK_LANGUAGE', () => {
-    expect(() => validateEnv({ FALLBACK_LANGUAGE: '' })).toThrow(
-      /Invalid environment variables/,
-    );
+    expect(validate({ FALLBACK_LANGUAGE: '' }).error).toBeDefined();
   });
 });
