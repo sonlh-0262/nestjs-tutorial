@@ -1,0 +1,18 @@
+# Runs the compiled production image instead of the watch-mode dev server:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# `!override` replaces the dev values instead of merging into them, so the
+# source bind mount, the debugger port and the dev watcher settings are all
+# dropped rather than carried into the production container.
+services:
+  api:
+    build:
+      target: production
+    environment: !override
+      NODE_ENV: production
+      PORT: 3000
+      SWAGGER_ENABLED: 'false'
+    ports: !override
+      - '${PORT:-3000}:3000'
+    volumes: !override []
+    command: !override ['node', 'dist/main']
