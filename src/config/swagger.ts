@@ -38,7 +38,15 @@ export function setupSwagger(
       schema: { type: 'string', enum: [...SUPPORTED_LANGUAGES] },
     })
     .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description:
+          'Access token from `POST /users` or `POST /users/login`. ' +
+          'Paste the raw JWT - Swagger UI sends it as `Authorization: Bearer <token>`. ' +
+          'The RealWorld `Authorization: Token <token>` scheme is accepted too.',
+      },
       'access-token',
     )
     .build();

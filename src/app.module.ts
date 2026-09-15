@@ -10,17 +10,24 @@ import * as path from 'path';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuthModule } from './auth/auth.module';
 import { LANGUAGE_FALLBACKS } from './common/constants/languages';
 import { AcceptLanguageAliasResolver } from './common/resolvers/accept-language-alias.resolver';
+import authConfig from './config/auth.config';
 import configuration, { AppConfig } from './config/configuration';
+import databaseConfig from './config/database.config';
 import { validateEnv } from './config/env.validation';
+import redisConfig from './config/redis.config';
+import { DatabaseModule } from './database/database.module';
+import { RedisModule } from './redis/redis.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
-      load: [configuration],
+      load: [configuration, databaseConfig, redisConfig, authConfig],
       validate: validateEnv,
       envFilePath: ['.env.local', '.env'],
     }),
@@ -48,6 +55,10 @@ import { validateEnv } from './config/env.validation';
         AcceptLanguageResolver,
       ],
     }),
+    DatabaseModule,
+    RedisModule,
+    UsersModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
