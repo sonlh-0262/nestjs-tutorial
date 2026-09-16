@@ -1,20 +1,26 @@
-import { MIN_JWT_SECRET_LENGTH, validateEnv } from './env.validation';
+import { MIN_JWT_SECRET_LENGTH, envValidationSchema } from './env.validation';
 
-/** Shortest value that satisfies the production secret rule. */
 const VALID_SECRET = 'x'.repeat(MIN_JWT_SECRET_LENGTH);
 
-describe('validateEnv', () => {
+const validate = (env: Record<string, unknown>) =>
+  envValidationSchema.validate(env, { abortEarly: false });
+
+describe('envValidationSchema', () => {
   it('accepts an empty environment (every variable has a default)', () => {
-    expect(() => validateEnv({})).not.toThrow();
+    expect(validate({}).error).toBeUndefined();
   });
 
   it('coerces PORT to a number', () => {
-    expect(validateEnv({ PORT: '3000' }).PORT).toBe(3000);
+    const result = validate({ PORT: '3000' });
+    if (result.error) {
+      throw result.error;
+    }
+    expect(result.value.PORT).toBe(3000);
   });
 
   it('accepts a full, valid environment', () => {
-    expect(() =>
-      validateEnv({
+    expect(
+      validate({
         NODE_ENV: 'production',
         PORT: '8080',
         APP_NAME: 'API',
@@ -39,149 +45,145 @@ describe('validateEnv', () => {
         JWT_EXPIRES_IN: '15m',
         JWT_ISSUER: 'api',
         BCRYPT_SALT_ROUNDS: '12',
-      }),
-    ).not.toThrow();
+      }).error,
+    ).toBeUndefined();
   });
 
   it('ignores variables it does not know about', () => {
-    expect(() => validateEnv({ SOME_OTHER_TOOL: 'whatever' })).not.toThrow();
+    expect(validate({ SOME_OTHER_TOOL: 'whatever' }).error).toBeUndefined();
   });
 
   it('rejects an unknown NODE_ENV', () => {
-    expect(() => validateEnv({ NODE_ENV: 'staging' })).toThrow(
-      /Invalid environment variables/,
-    );
+    expect(validate({ NODE_ENV: 'staging' }).error).toBeDefined();
   });
 
   it('rejects a non-numeric PORT', () => {
-    expect(() => validateEnv({ PORT: 'not-a-port' })).toThrow(
-      /Invalid environment variables/,
-    );
+    expect(validate({ PORT: 'not-a-port' }).error).toBeDefined();
   });
 
   it('rejects an out-of-range PORT', () => {
-    expect(() => validateEnv({ PORT: '70000' })).toThrow(
-      /Invalid environment variables/,
-    );
+    expect(validate({ PORT: '70000' }).error).toBeDefined();
   });
 
   it('rejects a non-boolean SWAGGER_ENABLED', () => {
-    expect(() => validateEnv({ SWAGGER_ENABLED: 'yes' })).toThrow(
-      /Invalid environment variables/,
-    );
+    expect(validate({ SWAGGER_ENABLED: 'yes' }).error).toBeDefined();
   });
 
   it('accepts each supported FALLBACK_LANGUAGE', () => {
-    expect(() => validateEnv({ FALLBACK_LANGUAGE: 'en' })).not.toThrow();
-    expect(() => validateEnv({ FALLBACK_LANGUAGE: 'jp' })).not.toThrow();
+    expect(validate({ FALLBACK_LANGUAGE: 'en' }).error).toBeUndefined();
+    expect(validate({ FALLBACK_LANGUAGE: 'jp' }).error).toBeUndefined();
   });
 
   it('rejects a FALLBACK_LANGUAGE the app has no translations for', () => {
-    // `vi` was dropped, so it must no longer be accepted.
-    expect(() => validateEnv({ FALLBACK_LANGUAGE: 'vi' })).toThrow(
-      /Invalid environment variables/,
-    );
+    expect(validate({ FALLBACK_LANGUAGE: 'vi' }).error).toBeDefined();
   });
 
   it('rejects an empty FALLBACK_LANGUAGE', () => {
-    expect(() => validateEnv({ FALLBACK_LANGUAGE: '' })).toThrow(
-      /Invalid environment variables/,
-    );
+    expect(validate({ FALLBACK_LANGUAGE: '' }).error).toBeDefined();
   });
 
   describe('database', () => {
     it('accepts an empty DB_PASSWORD (trust authentication)', () => {
-      expect(() => validateEnv({ DB_PASSWORD: '' })).not.toThrow();
+      expect(validate({ DB_PASSWORD: '' }).error).toBeUndefined();
     });
 
     it('coerces DB_PORT to a number', () => {
-      expect(validateEnv({ DB_PORT: '5432' }).DB_PORT).toBe(5432);
+      const result = validate({ DB_PORT: '5432' });
+      if (result.error) {
+        throw result.error;
+      }
+      expect(result.value.DB_PORT).toBe(5432);
     });
 
     it('rejects an out-of-range DB_PORT', () => {
-      expect(() => validateEnv({ DB_PORT: '70000' })).toThrow(
-        /Invalid environment variables/,
-      );
+      expect(validate({ DB_PORT: '70000' }).error).toBeDefined();
     });
 
     it('rejects an empty DB_HOST', () => {
-      expect(() => validateEnv({ DB_HOST: '' })).toThrow(
-        /Invalid environment variables/,
-      );
+      expect(validate({ DB_HOST: '' }).error).toBeDefined();
     });
 
     it('rejects a non-boolean DB_LOGGING', () => {
-      expect(() => validateEnv({ DB_LOGGING: '1' })).toThrow(
-        /Invalid environment variables/,
-      );
+      expect(validate({ DB_LOGGING: '1' }).error).toBeDefined();
     });
   });
 
   describe('redis', () => {
     it('coerces REDIS_DB to a number', () => {
-      expect(validateEnv({ REDIS_DB: '3' }).REDIS_DB).toBe(3);
+      const result = validate({ REDIS_DB: '3' });
+      if (result.error) {
+        throw result.error;
+      }
+      expect(result.value.REDIS_DB).toBe(3);
     });
 
     it('rejects a REDIS_DB outside the 0-15 range Redis provides', () => {
-      expect(() => validateEnv({ REDIS_DB: '16' })).toThrow(
-        /Invalid environment variables/,
-      );
+      expect(validate({ REDIS_DB: '16' }).error).toBeDefined();
     });
 
     it('accepts an empty REDIS_PASSWORD (no auth configured)', () => {
-      expect(() => validateEnv({ REDIS_PASSWORD: '' })).not.toThrow();
+      expect(validate({ REDIS_PASSWORD: '' }).error).toBeUndefined();
     });
   });
 
   describe('JWT_SECRET', () => {
     it('is optional outside production, where a dev fallback applies', () => {
-      expect(() => validateEnv({ NODE_ENV: 'development' })).not.toThrow();
-      expect(() => validateEnv({ NODE_ENV: 'test' })).not.toThrow();
+      expect(validate({ NODE_ENV: 'development' }).error).toBeUndefined();
+      expect(validate({ NODE_ENV: 'test' }).error).toBeUndefined();
     });
 
     it('is mandatory in production', () => {
-      expect(() => validateEnv({ NODE_ENV: 'production' })).toThrow(
-        /Invalid environment variables/,
-      );
+      expect(validate({ NODE_ENV: 'production' }).error).toBeDefined();
     });
 
     it('accepts a long enough secret in production', () => {
-      expect(() =>
-        validateEnv({ NODE_ENV: 'production', JWT_SECRET: VALID_SECRET }),
-      ).not.toThrow();
+      expect(
+        validate({ NODE_ENV: 'production', JWT_SECRET: VALID_SECRET }).error,
+      ).toBeUndefined();
     });
 
     it('rejects a secret shorter than the minimum, even in production', () => {
-      expect(() =>
-        validateEnv({ NODE_ENV: 'production', JWT_SECRET: 'too-short' }),
-      ).toThrow(/Invalid environment variables/);
+      expect(
+        validate({ NODE_ENV: 'production', JWT_SECRET: 'too-short' }).error,
+      ).toBeDefined();
     });
 
     it('still validates a secret that is supplied outside production', () => {
-      expect(() => validateEnv({ JWT_SECRET: 'too-short' })).toThrow(
-        /Invalid environment variables/,
-      );
-      expect(() => validateEnv({ JWT_SECRET: VALID_SECRET })).not.toThrow();
+      expect(validate({ JWT_SECRET: 'too-short' }).error).toBeDefined();
+      expect(validate({ JWT_SECRET: VALID_SECRET }).error).toBeUndefined();
+    });
+  });
+
+  describe('JWT_EXPIRES_IN', () => {
+    it('accepts a bare number of seconds', () => {
+      expect(validate({ JWT_EXPIRES_IN: '60' }).error).toBeUndefined();
+    });
+
+    it('accepts a number with a unit', () => {
+      expect(validate({ JWT_EXPIRES_IN: '15m' }).error).toBeUndefined();
+      expect(validate({ JWT_EXPIRES_IN: '1d' }).error).toBeUndefined();
+    });
+
+    it('rejects a malformed duration', () => {
+      expect(validate({ JWT_EXPIRES_IN: 'soon' }).error).toBeDefined();
     });
   });
 
   describe('BCRYPT_SALT_ROUNDS', () => {
     it('coerces to a number', () => {
-      expect(validateEnv({ BCRYPT_SALT_ROUNDS: '12' }).BCRYPT_SALT_ROUNDS).toBe(
-        12,
-      );
+      const result = validate({ BCRYPT_SALT_ROUNDS: '12' });
+      if (result.error) {
+        throw result.error;
+      }
+      expect(result.value.BCRYPT_SALT_ROUNDS).toBe(12);
     });
 
     it("rejects a cost below bcrypt's own minimum", () => {
-      expect(() => validateEnv({ BCRYPT_SALT_ROUNDS: '3' })).toThrow(
-        /Invalid environment variables/,
-      );
+      expect(validate({ BCRYPT_SALT_ROUNDS: '3' }).error).toBeDefined();
     });
 
     it("rejects a cost above bcrypt's own maximum", () => {
-      expect(() => validateEnv({ BCRYPT_SALT_ROUNDS: '32' })).toThrow(
-        /Invalid environment variables/,
-      );
+      expect(validate({ BCRYPT_SALT_ROUNDS: '32' }).error).toBeDefined();
     });
   });
 });

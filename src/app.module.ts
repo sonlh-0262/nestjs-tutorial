@@ -16,7 +16,7 @@ import { AcceptLanguageAliasResolver } from './common/resolvers/accept-language-
 import authConfig from './config/auth.config';
 import configuration, { AppConfig } from './config/configuration';
 import databaseConfig from './config/database.config';
-import { validateEnv } from './config/env.validation';
+import { envValidationSchema } from './config/env.validation';
 import redisConfig from './config/redis.config';
 import { DatabaseModule } from './database/database.module';
 import { RedisModule } from './redis/redis.module';
@@ -28,7 +28,8 @@ import { UsersModule } from './users/users.module';
       isGlobal: true,
       cache: true,
       load: [configuration, databaseConfig, redisConfig, authConfig],
-      validate: validateEnv,
+      validationSchema: envValidationSchema,
+      validationOptions: { abortEarly: false },
       envFilePath: ['.env.local', '.env'],
     }),
     I18nModule.forRootAsync({

@@ -1,18 +1,4 @@
-import { plainToInstance } from 'class-transformer';
-import {
-  IsEnum,
-  IsIn,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsString,
-  Matches,
-  Max,
-  Min,
-  MinLength,
-  ValidateIf,
-  validateSync,
-} from 'class-validator';
+import * as Joi from 'joi';
 
 import { SUPPORTED_LANGUAGES } from '../common/constants/languages';
 
@@ -26,146 +12,70 @@ export const MIN_JWT_SECRET_LENGTH = 32;
 
 export const JWT_DURATION_PATTERN = /^\d+(ms|s|m|h|d|w|y)?$/;
 
-export class EnvironmentVariables {
-  @IsOptional()
-  @IsEnum(Environment)
+export interface EnvironmentVariables {
   NODE_ENV?: Environment;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  @Max(65535)
   PORT?: number;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
   APP_NAME?: string;
-
-  @IsOptional()
-  @IsString()
   API_PREFIX?: string;
-
-  @IsOptional()
-  @IsIn([...SUPPORTED_LANGUAGES])
   FALLBACK_LANGUAGE?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
   SWAGGER_PATH?: string;
-
-  @IsOptional()
-  @IsIn(['true', 'false'])
   SWAGGER_ENABLED?: string;
 
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
   DB_HOST?: string;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  @Max(65535)
   DB_PORT?: number;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
   DB_USERNAME?: string;
-
-  @IsOptional()
-  @IsString()
   DB_PASSWORD?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
   DB_DATABASE?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
   DB_SCHEMA?: string;
-
-  @IsOptional()
-  @IsIn(['true', 'false'])
   DB_SSL?: string;
-
-  @IsOptional()
-  @IsIn(['true', 'false'])
   DB_LOGGING?: string;
 
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
   REDIS_HOST?: string;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  @Max(65535)
   REDIS_PORT?: number;
-
-  @IsOptional()
-  @IsString()
   REDIS_PASSWORD?: string;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(15)
   REDIS_DB?: number;
-
-  @IsOptional()
-  @IsString()
   REDIS_KEY_PREFIX?: string;
 
-  @ValidateIf((env: EnvironmentVariables) => {
-    return env.NODE_ENV === Environment.Production || env.JWT_SECRET != null;
-  })
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(MIN_JWT_SECRET_LENGTH)
   JWT_SECRET?: string;
-
-  @IsOptional()
-  @Matches(JWT_DURATION_PATTERN, {
-    message: 'JWT_EXPIRES_IN must be a duration such as 60, 30s, 15m, 1d or 2w',
-  })
   JWT_EXPIRES_IN?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
   JWT_ISSUER?: string;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(4)
-  @Max(31)
   BCRYPT_SALT_ROUNDS?: number;
 }
 
-export function validateEnv(
-  config: Record<string, unknown>,
-): EnvironmentVariables {
-  const validatedConfig = plainToInstance(EnvironmentVariables, config, {
-    enableImplicitConversion: true,
-  });
+export const envValidationSchema = Joi.object<EnvironmentVariables>({
+  NODE_ENV: Joi.string()
+    .valid(...Object.values(Environment))
+    .optional(),
+  PORT: Joi.number().min(1).max(65535).optional(),
+  APP_NAME: Joi.string().min(1).optional(),
+  API_PREFIX: Joi.string().allow('').optional(),
+  FALLBACK_LANGUAGE: Joi.string()
+    .valid(...SUPPORTED_LANGUAGES)
+    .optional(),
+  SWAGGER_PATH: Joi.string().min(1).optional(),
+  SWAGGER_ENABLED: Joi.string().valid('true', 'false').optional(),
 
-  const errors = validateSync(validatedConfig, {
-    skipMissingProperties: false,
-  });
+  DB_HOST: Joi.string().min(1).optional(),
+  DB_PORT: Joi.number().min(1).max(65535).optional(),
+  DB_USERNAME: Joi.string().min(1).optional(),
+  DB_PASSWORD: Joi.string().allow('').optional(),
+  DB_DATABASE: Joi.string().min(1).optional(),
+  DB_SCHEMA: Joi.string().min(1).optional(),
+  DB_SSL: Joi.string().valid('true', 'false').optional(),
+  DB_LOGGING: Joi.string().valid('true', 'false').optional(),
 
-  if (errors.length > 0) {
-    throw new Error(
-      `Invalid environment variables:\n${errors
-        .map((error) => `  - ${error.toString()}`)
-        .join('\n')}`,
-    );
-  }
+  REDIS_HOST: Joi.string().min(1).optional(),
+  REDIS_PORT: Joi.number().min(1).max(65535).optional(),
+  REDIS_PASSWORD: Joi.string().allow('').optional(),
+  REDIS_DB: Joi.number().min(0).max(15).optional(),
+  REDIS_KEY_PREFIX: Joi.string().optional(),
 
-  return validatedConfig;
-}
+  JWT_SECRET: Joi.string().min(MIN_JWT_SECRET_LENGTH).when('NODE_ENV', {
+    is: Environment.Production,
+    then: Joi.required(),
+    otherwise: Joi.optional(),
+  }),
+  JWT_EXPIRES_IN: Joi.string().pattern(JWT_DURATION_PATTERN).optional(),
+  JWT_ISSUER: Joi.string().min(1).optional(),
+  BCRYPT_SALT_ROUNDS: Joi.number().min(4).max(31).optional(),
+}).unknown(true);
