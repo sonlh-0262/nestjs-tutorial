@@ -10,6 +10,7 @@ import * as path from 'path';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AttachmentsModule } from './attachments/attachments.module';
 import { AuthModule } from './auth/auth.module';
 import { LANGUAGE_FALLBACKS } from './common/constants/languages';
 import { AcceptLanguageAliasResolver } from './common/resolvers/accept-language-alias.resolver';
@@ -18,7 +19,9 @@ import configuration, { AppConfig } from './config/configuration';
 import databaseConfig from './config/database.config';
 import { envValidationSchema } from './config/env.validation';
 import redisConfig from './config/redis.config';
+import storageConfig from './config/storage.config';
 import { DatabaseModule } from './database/database.module';
+import { ProfilesModule } from './profiles/profiles.module';
 import { RedisModule } from './redis/redis.module';
 import { UsersModule } from './users/users.module';
 
@@ -27,7 +30,13 @@ import { UsersModule } from './users/users.module';
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
-      load: [configuration, databaseConfig, redisConfig, authConfig],
+      load: [
+        configuration,
+        databaseConfig,
+        redisConfig,
+        authConfig,
+        storageConfig,
+      ],
       validationSchema: envValidationSchema,
       validationOptions: { abortEarly: false },
       envFilePath: ['.env.local', '.env'],
@@ -60,6 +69,8 @@ import { UsersModule } from './users/users.module';
     RedisModule,
     UsersModule,
     AuthModule,
+    AttachmentsModule,
+    ProfilesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

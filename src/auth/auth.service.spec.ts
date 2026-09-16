@@ -7,6 +7,7 @@ import { I18nService } from 'nestjs-i18n';
 
 import { AuthConfig } from '../config/auth.config';
 import { User } from '../users/entities/user.entity';
+import { PasswordService } from '../users/password.service';
 import { UsersService } from '../users/users.service';
 import { AuthService, DUMMY_PASSWORD_HASH } from './auth.service';
 import { TokenBlacklistService } from './token-blacklist.service';
@@ -34,12 +35,15 @@ describe('AuthService', () => {
   let service: AuthService;
 
   const usersServiceMock = {
-    findByEmail: jest.fn().mockResolvedValue(null),
-    findByUsername: jest.fn().mockResolvedValue(null),
+    assertCredentialsAvailable: jest.fn().mockResolvedValue(undefined),
     findByEmailWithPassword: jest.fn().mockResolvedValue(null),
     findById: jest.fn().mockResolvedValue(null),
     create: jest.fn(),
   };
+
+  const passwordService = new PasswordService({
+    getOrThrow: () => AUTH_CONFIG,
+  } as unknown as ConfigService);
 
   const jwtServiceMock = {
     sign: jest.fn().mockReturnValue('signed.jwt.token'),
@@ -52,17 +56,15 @@ describe('AuthService', () => {
 
   const i18nMock = { t: jest.fn((key: string) => key) };
 
-  const configServiceMock = { getOrThrow: jest.fn(() => AUTH_CONFIG) };
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: UsersService, useValue: usersServiceMock },
+        { provide: PasswordService, useValue: passwordService },
         { provide: JwtService, useValue: jwtServiceMock },
         { provide: TokenBlacklistService, useValue: tokenBlacklistMock },
         { provide: I18nService, useValue: i18nMock },
-        { provide: ConfigService, useValue: configServiceMock },
       ],
     }).compile();
 
@@ -71,8 +73,7 @@ describe('AuthService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
-    usersServiceMock.findByEmail.mockResolvedValue(null);
-    usersServiceMock.findByUsername.mockResolvedValue(null);
+    usersServiceMock.assertCredentialsAvailable.mockResolvedValue(undefined);
     usersServiceMock.findByEmailWithPassword.mockResolvedValue(null);
   });
 
@@ -133,30 +134,33 @@ describe('AuthService', () => {
       );
     });
 
-    it('rejects an email that is already registered', async () => {
-      usersServiceMock.findByEmail.mockResolvedValueOnce(buildUser());
+    it('checks the email and username before creating anything', async () => {
+      usersServiceMock.create.mockResolvedValueOnce(buildUser());
 
-      await expect(service.register(input)).rejects.toBeInstanceOf(
-        ConflictException,
+      await service.register(input);
+
+      expect(usersServiceMock.assertCredentialsAvailable).toHaveBeenCalledWith(
+        input.email,
+        input.username,
       );
-      expect(i18nMock.t).toHaveBeenCalledWith('auth.EMAIL_TAKEN');
-      expect(usersServiceMock.create).not.toHaveBeenCalled();
     });
 
-    it('rejects a username that is already taken', async () => {
-      usersServiceMock.findByUsername.mockResolvedValueOnce(buildUser());
+    it('rejects credentials that are already taken', async () => {
+      usersServiceMock.assertCredentialsAvailable.mockRejectedValueOnce(
+        new ConflictException('auth.EMAIL_TAKEN'),
+      );
 
       await expect(service.register(input)).rejects.toBeInstanceOf(
         ConflictException,
       );
-      expect(i18nMock.t).toHaveBeenCalledWith('auth.USERNAME_TAKEN');
+      expect(usersServiceMock.create).not.toHaveBeenCalled();
     });
 
     it('turns a lost race into the same conflict as the up-front check', async () => {
       usersServiceMock.create.mockRejectedValueOnce({ code: '23505' });
-      usersServiceMock.findByEmail
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(buildUser());
+      usersServiceMock.assertCredentialsAvailable
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new ConflictException('auth.EMAIL_TAKEN'));
 
       await expect(service.register(input)).rejects.toBeInstanceOf(
         ConflictException,

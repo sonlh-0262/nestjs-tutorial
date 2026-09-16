@@ -12,6 +12,8 @@ export const MIN_JWT_SECRET_LENGTH = 32;
 
 export const JWT_DURATION_PATTERN = /^\d+(ms|s|m|h|d|w|y)?$/;
 
+export const MAX_UPLOAD_SIZE_MB = 25;
+
 export interface EnvironmentVariables {
   NODE_ENV?: Environment;
   PORT?: number;
@@ -40,6 +42,9 @@ export interface EnvironmentVariables {
   JWT_EXPIRES_IN?: string;
   JWT_ISSUER?: string;
   BCRYPT_SALT_ROUNDS?: number;
+
+  UPLOAD_DIR?: string;
+  UPLOAD_MAX_FILE_SIZE_MB?: number;
 }
 
 export const envValidationSchema = Joi.object<EnvironmentVariables>({
@@ -78,4 +83,10 @@ export const envValidationSchema = Joi.object<EnvironmentVariables>({
   JWT_EXPIRES_IN: Joi.string().pattern(JWT_DURATION_PATTERN).optional(),
   JWT_ISSUER: Joi.string().min(1).optional(),
   BCRYPT_SALT_ROUNDS: Joi.number().min(4).max(31).optional(),
+
+  UPLOAD_DIR: Joi.string().min(1).optional(),
+  UPLOAD_MAX_FILE_SIZE_MB: Joi.number()
+    .greater(0)
+    .max(MAX_UPLOAD_SIZE_MB)
+    .optional(),
 }).unknown(true);
