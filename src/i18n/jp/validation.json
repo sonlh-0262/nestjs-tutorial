@@ -1,0 +1,6 @@
+{
+  "NOT_EMPTY": "{property}は必須です",
+  "IS_STRING": "{property}は文字列で入力してください",
+  "MAX_LENGTH": "{property}は{constraints.0}文字以内で入力してください",
+  "MIN_LENGTH": "{property}は{constraints.0}文字以上で入力してください"
+}
