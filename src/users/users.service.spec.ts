@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { I18nService } from 'nestjs-i18n';
@@ -207,6 +207,42 @@ describe('UsersService', () => {
 
   describe('update', () => {
     const user = buildUser();
+
+    describe('an avatar file and an image URL are mutually exclusive', () => {
+      const avatar = { originalname: 'me.png', buffer: PNG };
+
+      it('rejects a request carrying both', async () => {
+        await expect(
+          service.update(user, { image: 'https://example.com/a.png' }, avatar),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      it('rejects both even when the URL is an explicit null', async () => {
+        await expect(
+          service.update(user, { image: null }, avatar),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      it('rejects before touching the database or the attachment store', async () => {
+        await expect(
+          service.update(user, { image: 'https://example.com/a.png' }, avatar),
+        ).rejects.toThrow();
+
+        expect(repositoryMock.findOne).not.toHaveBeenCalled();
+        expect(dataSourceMock.transaction).not.toHaveBeenCalled();
+        expect(attachmentsServiceMock.replaceFor).not.toHaveBeenCalled();
+      });
+
+      it('accepts an avatar on its own', async () => {
+        await expect(service.update(user, {}, avatar)).resolves.toBeDefined();
+      });
+
+      it('accepts an image URL on its own', async () => {
+        await expect(
+          service.update(user, { image: 'https://example.com/a.png' }),
+        ).resolves.toBeDefined();
+      });
+    });
 
     it('writes only the fields that were sent', async () => {
       await service.update(user, { bio: 'new bio' });

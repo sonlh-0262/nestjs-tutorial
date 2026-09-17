@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -10,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiBody,
   ApiConflictResponse,
@@ -23,14 +23,13 @@ import {
   ApiUnsupportedMediaTypeResponse,
   getSchemaPath,
 } from '@nestjs/swagger';
-import { I18nService } from 'nestjs-i18n';
 
 import { SUPPORTED_IMAGE_MIME_TYPES } from '../attachments/storage/image-type';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SWAGGER_BEARER_AUTH_NAME } from '../common/constants/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { toUserResponse, UserResponseDto } from './dto/user.dto';
-import { UpdateUserBodyDto, UpdateUserDto } from './dto/update-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { UsersService } from './users.service';
 
@@ -40,10 +39,7 @@ const AVATAR_FIELD = 'avatar';
 @ApiExtraModels(UpdateUserDto)
 @Controller('user')
 export class UsersController {
-  constructor(
-    private readonly usersService: UsersService,
-    private readonly i18n: I18nService,
-  ) {}
+  constructor(private readonly usersService: UsersService) {}
 
   @Get()
   @UseGuards(JwtAuthGuard)
@@ -103,6 +99,10 @@ export class UsersController {
   @ApiUnauthorizedResponse({
     description: 'Missing, invalid or revoked token.',
   })
+  @ApiBadRequestResponse({
+    description:
+      'Validation failed, or both an `avatar` file and an `image` URL were sent.',
+  })
   @ApiConflictResponse({
     description: 'The email or username belongs to another account.',
   })
@@ -115,12 +115,8 @@ export class UsersController {
     @Body() dto: UpdateUserDto,
     @UploadedFile() avatar?: Express.Multer.File,
   ): Promise<UserResponseDto> {
-    const input: UpdateUserBodyDto = dto.user ?? {};
-
-    if (avatar && input.image !== undefined) {
-      throw new BadRequestException(this.i18n.t('attachment.IMAGE_CONFLICT'));
-    }
-
-    return toUserResponse(await this.usersService.update(user, input, avatar));
+    return toUserResponse(
+      await this.usersService.update(user, dto.user ?? {}, avatar),
+    );
   }
 }

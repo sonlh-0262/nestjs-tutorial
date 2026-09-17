@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { I18nService } from 'nestjs-i18n';
 import { DataSource, EntityManager, Not, Repository } from 'typeorm';
@@ -70,6 +75,10 @@ export class UsersService {
     input: UpdateUserBodyDto,
     avatar?: UploadedImage,
   ): Promise<User> {
+    if (avatar && input.image !== undefined) {
+      throw new BadRequestException(this.i18n.t('attachment.IMAGE_CONFLICT'));
+    }
+
     await this.assertCredentialsAvailable(input.email, input.username, user.id);
 
     const passwordHash = input.password
