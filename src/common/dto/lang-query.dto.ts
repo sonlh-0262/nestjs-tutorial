@@ -1,9 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
 
-import { SUPPORTED_LANGUAGES } from '../constants/languages';
-
-const LANGUAGES = SUPPORTED_LANGUAGES.join(' / ');
+import {
+  SUPPORTED_LANGUAGES,
+  SUPPORTED_LANGUAGES_LABEL,
+} from '../constants/languages';
 
 /**
  * Base class for any DTO bound with `@Query()`.
@@ -19,7 +20,7 @@ const LANGUAGES = SUPPORTED_LANGUAGES.join(' / ');
  */
 export class LangQueryDto {
   @ApiPropertyOptional({
-    description: `Response language (${LANGUAGES}).`,
+    description: `Response language (${SUPPORTED_LANGUAGES_LABEL}).`,
     enum: SUPPORTED_LANGUAGES,
     example: 'jp',
   })

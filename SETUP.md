@@ -10,12 +10,19 @@ Requires Docker Desktop (Compose v2).
 # 1. Create your env file
 cp .env.example .env
 
-# 2. Build and start (first build takes a few minutes)
-docker compose up --build
+# 2. Build and start the API, Postgres and Redis
+#    (first build takes a few minutes)
+docker compose up --build -d
+
+# 3. Create the schema
+docker compose exec api npm run migration:run
 ```
 
 The API is on <http://localhost:3000>, Swagger UI on
 <http://localhost:3000/api>.
+
+`docker compose up` starts three services: `api`, `postgres` and `redis`. The
+API waits for both of the others to report healthy before it starts.
 
 Source is bind-mounted, so editing a file under `src/` (including the
 translation files in `src/i18n/`) reloads the server automatically, typically
@@ -79,16 +86,47 @@ nvm use 22
 # 1. Env file
 cp .env.example .env         # Windows PowerShell: copy .env.example .env
 
-# 2. Dependencies
+# 2. Start the database and cache (the API itself runs on the host)
+docker compose up -d postgres redis
+
+#    ...and point the app at them - in .env set:
+#      DB_HOST=localhost
+#      REDIS_HOST=localhost
+
+# 3. Dependencies
 npm install
 
-# 3. Start in watch mode
+# 4. Create the schema
+npm run migration:run
+
+# 5. Start in watch mode
 npm run start:dev
 ```
 
 - API: <http://localhost:3000>
 - Swagger UI: <http://localhost:3000/api>
 - OpenAPI JSON: <http://localhost:3000/api-json>
+
+### Database migrations
+
+The schema is created only by migrations - `synchronize` is off everywhere.
+
+```bash
+npm run migration:run      # apply everything pending
+npm run migration:show     # what is applied, what is not
+npm run migration:revert   # undo the last one
+npm run migration:reset    # drop the schema and re-apply from scratch
+
+# new migration, written by hand
+npm run migration:create -- src/database/migrations/AddSomething
+
+# new migration, generated from the difference against the entities
+npm run migration:generate -- src/database/migrations/AddSomething
+```
+
+On a clean tree `migration:generate` must report *"No changes in database
+schema were found"*. If it writes a file instead, an entity was changed without
+a matching migration.
 
 ### Verify everything passes
 
@@ -123,6 +161,46 @@ publishes 9229 as well, so the same works against the container.
 | `SWAGGER_PATH`      | `api`              | Where the Swagger UI is mounted               |
 | `FALLBACK_LANGUAGE` | `en`               | Language used when the requested one is unknown; must be `en` or `jp` |
 
+### Database
+
+| Variable       | Default           | Description                                      |
+| -------------- | ----------------- | ------------------------------------------------ |
+| `DB_HOST`      | `localhost`       | `postgres` inside docker compose                 |
+| `DB_PORT`      | `5432`            | Port the API connects to                         |
+| `DB_USERNAME`  | `postgres`        |                                                  |
+| `DB_PASSWORD`  | `postgres`        | May be empty for `trust` authentication          |
+| `DB_DATABASE`  | `nestjs_tutorial` |                                                  |
+| `DB_SCHEMA`    | `public`          |                                                  |
+| `DB_SSL`       | `false`           | `true` enables TLS                               |
+| `DB_LOGGING`   | `false`           | `true` logs every SQL statement                  |
+| `DB_HOST_PORT` | `5432`            | Compose only: host port Postgres is published on |
+
+### Redis
+
+| Variable           | Default            | Description                                   |
+| ------------------ | ------------------ | --------------------------------------------- |
+| `REDIS_HOST`       | `localhost`        | `redis` inside docker compose                 |
+| `REDIS_PORT`       | `6379`             | Port the API connects to                      |
+| `REDIS_PASSWORD`   | _(empty)_          | Empty means no authentication                 |
+| `REDIS_DB`         | `0`                | 0-15                                          |
+| `REDIS_KEY_PREFIX` | `nestjs-tutorial:` | Namespaces every key                          |
+| `REDIS_HOST_PORT`  | `6379`             | Compose only: host port Redis is published on |
+
+### Authentication
+
+| Variable             | Default             | Description                                             |
+| -------------------- | ------------------- | ------------------------------------------------------- |
+| `JWT_SECRET`         | dev fallback        | **Required when `NODE_ENV=production`**, min 32 chars   |
+| `JWT_EXPIRES_IN`     | `1d`                | `ms`-style duration: `60`, `30s`, `15m`, `1d`, `2w`     |
+| `JWT_ISSUER`         | `nestjs-tutorial`   | Written into, and verified on, every token              |
+| `BCRYPT_SALT_ROUNDS` | `10`                | 4-31. Use 4 in tests, 10 or more in production          |
+
+Generate a production secret with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
+
 Invalid values fail fast at startup with a clear message (see
 `src/config/env.validation.ts`).
 
@@ -142,6 +220,26 @@ curl -H "Accept-Language: ja-JP" http://localhost:3000/health
 # {"status":"ok","message":"サービスは正常に稼働しています",...}
 ```
 
+### Authentication
+
+```bash
+# Register - the response carries the access token; copy it into TOKEN
+curl -X POST http://localhost:3000/users \
+  -H 'Content-Type: application/json' \
+  -d '{"user":{"username":"jake","email":"jake@jake.jake","password":"Sup3rS3cret!"}}'
+
+TOKEN=...   # the "token" value from the response above
+
+# Current user  (`Bearer` is accepted as well as `Token`)
+curl http://localhost:3000/user -H "Authorization: Token $TOKEN"
+# {"user":{"email":"jake@jake.jake","username":"jake","bio":null,"image":null}}
+
+# Log out, then try again - the token is dead
+curl -X POST http://localhost:3000/users/logout -H "Authorization: Token $TOKEN"
+curl -i http://localhost:3000/user -H "Authorization: Token $TOKEN"
+# HTTP/1.1 401 Unauthorized
+```
+
 ---
 
 ## Troubleshooting
@@ -153,4 +251,8 @@ curl -H "Accept-Language: ja-JP" http://localhost:3000/health
 | Translations not updating                  | They are copied to `dist/i18n` by the Nest CLI asset step; `npm run build` (or restart the container) if they look stale |
 | `Cannot find module` after `git pull`      | `npm install` (or `docker compose up --build`)                   |
 | Host `node_modules` shadowing the container | Already handled by the anonymous volume in `docker-compose.yml`  |
-| Windows line-ending warnings from git      | `git config core.autocrlf input`                                 |
+| Windows line-ending warnings from git      | Handled by `.gitattributes` (`* text=auto eol=lf`); run `git add --renormalize .` once if an old checkout still shows CRLF |
+| `Port 5432` or `6379` already in use        | Another project holds it. Set `DB_HOST_PORT` / `REDIS_HOST_PORT` in `.env` - these change only the **host** port, not the one the API uses |
+| `relation "users" does not exist`           | The schema was never created: `npm run migration:run`           |
+| `ECONNREFUSED` to Postgres or Redis         | `docker compose up -d postgres redis`, and set `DB_HOST=localhost` / `REDIS_HOST=localhost` when the API runs on the host |
+| Logout appears not to work                 | Check Redis is reachable - the denylist lives there, so without it a token stays valid until it expires |

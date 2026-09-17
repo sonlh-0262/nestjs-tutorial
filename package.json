@@ -1,7 +1,7 @@
 {
   "name": "nestjs-tutorial",
   "version": "0.1.0",
-  "description": "NestJS tutorial API (RealWorld-style) - Pull 1: init + hello world + i18n + swagger",
+  "description": "NestJS tutorial API (RealWorld-style) - Pull 2: manual migrations + JWT auth with Redis token blacklist",
   "author": "",
   "private": true,
   "license": "UNLICENSED",
@@ -22,20 +22,38 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json --runInBand"
+    "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
+    "typeorm": "typeorm-ts-node-commonjs -d src/database/data-source.ts",
+    "migration:create": "typeorm-ts-node-commonjs migration:create",
+    "migration:generate": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:generate",
+    "migration:run": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:run",
+    "migration:revert": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:revert",
+    "migration:show": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:show",
+    "schema:drop": "typeorm-ts-node-commonjs -d src/database/data-source.ts schema:drop",
+    "migration:reset": "npm run schema:drop && npm run migration:run"
   },
   "dependencies": {
     "@nestjs/common": "^11.2.3",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.2.3",
+    "@nestjs/jwt": "^11.0.2",
+    "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.2.3",
     "@nestjs/swagger": "^11.4.7",
+    "@nestjs/typeorm": "^11.0.3",
+    "bcryptjs": "^3.0.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "dotenv": "^17.4.1",
+    "ioredis": "^5.9.1",
     "joi": "^18.2.9",
     "nestjs-i18n": "^10.8.5",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "pg": "^8.23.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "typeorm": "^0.3.31"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -45,6 +63,7 @@
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.10.0",
+    "@types/passport-jwt": "^4.0.1",
     "@types/supertest": "^6.0.2",
     "eslint": "^10.0.0",
     "eslint-config-prettier": "^10.1.8",
@@ -78,7 +97,9 @@
     "coveragePathIgnorePatterns": [
       "main.ts",
       ".module.ts",
-      ".dto.ts"
+      ".dto.ts",
+      ".entity.ts",
+      "migrations/"
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",

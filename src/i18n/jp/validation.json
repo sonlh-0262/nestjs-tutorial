@@ -1,6 +1,9 @@
 {
   "NOT_EMPTY": "{property}は必須です",
   "IS_STRING": "{property}は文字列で入力してください",
+  "IS_OBJECT": "{property}はオブジェクトで入力してください",
+  "IS_EMAIL": "{property}は有効なメールアドレスで入力してください",
+  "USERNAME_FORMAT": "{property}は英数字、アンダースコア、ハイフンのみ使用できます",
   "MAX_LENGTH": "{property}は{constraints.0}文字以内で入力してください",
   "MIN_LENGTH": "{property}は{constraints.0}文字以上で入力してください"
 }

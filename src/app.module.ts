@@ -10,26 +10,41 @@ import * as path from 'path';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { LANGUAGE_FALLBACKS } from './common/constants/languages';
+import { AuthModule } from './auth/auth.module';
+import {
+  LANGUAGE_FALLBACKS,
+  LANGUAGE_HEADER,
+  LANGUAGE_QUERY_PARAMS,
+} from './common/constants/languages';
 import { AcceptLanguageAliasResolver } from './common/resolvers/accept-language-alias.resolver';
-import configuration, { AppConfig } from './config/configuration';
+import authConfig from './config/auth.config';
+import { ENV_FILE_PATHS } from './config/config.constants';
+import configuration, {
+  APP_CONFIG_KEY,
+  AppConfig,
+} from './config/configuration';
+import databaseConfig from './config/database.config';
 import { envValidationSchema } from './config/env.validation';
+import redisConfig from './config/redis.config';
+import { DatabaseModule } from './database/database.module';
+import { RedisModule } from './redis/redis.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
-      load: [configuration],
+      load: [configuration, databaseConfig, redisConfig, authConfig],
       validationSchema: envValidationSchema,
       validationOptions: { abortEarly: false },
-      envFilePath: ['.env.local', '.env'],
+      envFilePath: ENV_FILE_PATHS,
     }),
     I18nModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const config = configService.getOrThrow<AppConfig>('app');
+        const config = configService.getOrThrow<AppConfig>(APP_CONFIG_KEY);
 
         return {
           fallbackLanguage: config.fallbackLanguage,
@@ -41,14 +56,18 @@ import { envValidationSchema } from './config/env.validation';
         };
       },
       resolvers: [
-        { use: QueryResolver, options: ['lang', 'l'] },
-        new HeaderResolver(['x-lang']),
+        { use: QueryResolver, options: LANGUAGE_QUERY_PARAMS },
+        new HeaderResolver([LANGUAGE_HEADER]),
         // Must come before the bundled resolver: it maps `ja` / `ja-JP` onto
         // the `jp` catalogue, which the bundled one cannot do on its own.
         AcceptLanguageAliasResolver,
         AcceptLanguageResolver,
       ],
     }),
+    DatabaseModule,
+    RedisModule,
+    UsersModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
