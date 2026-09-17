@@ -6,11 +6,10 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 
 import { AuthConfig, AUTH_CONFIG_KEY } from '../../config/auth.config';
 import { UsersService } from '../../users/users.service';
+import { JWT_AUTH_HEADER_SCHEME, JWT_STRATEGY_NAME } from '../auth.constants';
 import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
 import { TokenBlacklistService } from '../token-blacklist.service';
-
-export const JWT_STRATEGY_NAME = 'jwt';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, JWT_STRATEGY_NAME) {
@@ -24,7 +23,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, JWT_STRATEGY_NAME) {
 
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
-        ExtractJwt.fromAuthHeaderWithScheme('Token'),
+        ExtractJwt.fromAuthHeaderWithScheme(JWT_AUTH_HEADER_SCHEME),
         ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
       ignoreExpiration: false,

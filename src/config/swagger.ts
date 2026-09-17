@@ -1,7 +1,12 @@
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
-import { SUPPORTED_LANGUAGES } from '../common/constants/languages';
+import {
+  LANGUAGE_QUERY_PARAM,
+  SUPPORTED_LANGUAGES,
+  SUPPORTED_LANGUAGES_LABEL,
+} from '../common/constants/languages';
+import { SWAGGER_BEARER_AUTH_NAME } from '../common/constants/swagger';
 import { AppConfig } from './configuration';
 
 /**
@@ -16,25 +21,23 @@ export function setupSwagger(
     return;
   }
 
-  const languages = SUPPORTED_LANGUAGES.join(' / ');
-
   const config = new DocumentBuilder()
     .setTitle(appConfig.name)
     .setDescription(
       [
         'NestJS tutorial API.',
         '',
-        `Responses are localised (${languages}). Choose a language with the`,
+        `Responses are localised (${SUPPORTED_LANGUAGES_LABEL}). Choose a language with the`,
         '`?lang=jp` query parameter, the `x-lang` header, or a standard',
         '`Accept-Language` header (`ja` and `ja-JP` also resolve to `jp`).',
       ].join('\n'),
     )
     .setVersion('0.1.0')
     .addGlobalParameters({
-      name: 'lang',
+      name: LANGUAGE_QUERY_PARAM,
       in: 'query',
       required: false,
-      description: `Response language (${languages}).`,
+      description: `Response language (${SUPPORTED_LANGUAGES_LABEL}).`,
       schema: { type: 'string', enum: [...SUPPORTED_LANGUAGES] },
     })
     .addBearerAuth(
@@ -47,7 +50,7 @@ export function setupSwagger(
           'Paste the raw JWT - Swagger UI sends it as `Authorization: Bearer <token>`. ' +
           'The RealWorld `Authorization: Token <token>` scheme is accepted too.',
       },
-      'access-token',
+      SWAGGER_BEARER_AUTH_NAME,
     )
     .build();
 

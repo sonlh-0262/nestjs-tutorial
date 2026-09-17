@@ -8,7 +8,8 @@ import { I18nService } from 'nestjs-i18n';
 import { AuthConfig } from '../config/auth.config';
 import { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
-import { AuthService, DUMMY_PASSWORD_HASH } from './auth.service';
+import { DUMMY_PASSWORD_HASH } from './auth.constants';
+import { AuthService } from './auth.service';
 import { TokenBlacklistService } from './token-blacklist.service';
 
 const AUTH_CONFIG: AuthConfig = {

@@ -8,6 +8,7 @@ import {
 } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { SWAGGER_BEARER_AUTH_NAME } from '../common/constants/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { toUserResponse, UserResponseDto } from './dto/user.dto';
 import { User } from './entities/user.entity';
@@ -17,7 +18,7 @@ import { User } from './entities/user.entity';
 export class UsersController {
   @Get()
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('access-token')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
   @ApiOperation({
     summary: 'Get current user',
     description:

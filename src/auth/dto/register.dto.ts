@@ -12,14 +12,28 @@ import {
 } from 'class-validator';
 import { i18nValidationMessage } from 'nestjs-i18n';
 
-const USERNAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
+import {
+  EMAIL_MAX_LENGTH,
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+  USERNAME_PATTERN,
+} from '../../users/users.constants';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../auth.constants';
 
 export class RegisterUserBodyDto {
-  @ApiProperty({ example: 'jake', minLength: 3, maxLength: 50 })
+  @ApiProperty({
+    example: 'jake',
+    minLength: USERNAME_MIN_LENGTH,
+    maxLength: USERNAME_MAX_LENGTH,
+  })
   @IsString({ message: i18nValidationMessage('validation.IS_STRING') })
   @IsNotEmpty({ message: i18nValidationMessage('validation.NOT_EMPTY') })
-  @MinLength(3, { message: i18nValidationMessage('validation.MIN_LENGTH') })
-  @MaxLength(50, { message: i18nValidationMessage('validation.MAX_LENGTH') })
+  @MinLength(USERNAME_MIN_LENGTH, {
+    message: i18nValidationMessage('validation.MIN_LENGTH'),
+  })
+  @MaxLength(USERNAME_MAX_LENGTH, {
+    message: i18nValidationMessage('validation.MAX_LENGTH'),
+  })
   @Matches(USERNAME_PATTERN, {
     message: i18nValidationMessage('validation.USERNAME_FORMAT'),
   })
@@ -28,18 +42,32 @@ export class RegisterUserBodyDto {
   )
   username: string;
 
-  @ApiProperty({ example: 'jake@jake.jake', format: 'email' })
+  @ApiProperty({
+    example: 'jake@jake.jake',
+    format: 'email',
+    maxLength: EMAIL_MAX_LENGTH,
+  })
   @IsEmail({}, { message: i18nValidationMessage('validation.IS_EMAIL') })
-  @MaxLength(255, { message: i18nValidationMessage('validation.MAX_LENGTH') })
+  @MaxLength(EMAIL_MAX_LENGTH, {
+    message: i18nValidationMessage('validation.MAX_LENGTH'),
+  })
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
   email: string;
 
-  @ApiProperty({ example: 'Sup3rS3cret!', minLength: 8, maxLength: 72 })
+  @ApiProperty({
+    example: 'Sup3rS3cret!',
+    minLength: PASSWORD_MIN_LENGTH,
+    maxLength: PASSWORD_MAX_LENGTH,
+  })
   @IsString({ message: i18nValidationMessage('validation.IS_STRING') })
-  @MinLength(8, { message: i18nValidationMessage('validation.MIN_LENGTH') })
-  @MaxLength(72, { message: i18nValidationMessage('validation.MAX_LENGTH') })
+  @MinLength(PASSWORD_MIN_LENGTH, {
+    message: i18nValidationMessage('validation.MIN_LENGTH'),
+  })
+  @MaxLength(PASSWORD_MAX_LENGTH, {
+    message: i18nValidationMessage('validation.MAX_LENGTH'),
+  })
   password: string;
 }
 

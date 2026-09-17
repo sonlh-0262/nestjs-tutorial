@@ -35,3 +35,18 @@ export const LANGUAGE_FALLBACKS: Record<string, string> = {
   ja: 'jp',
   'ja-*': 'jp',
 };
+
+export const LANGUAGE_QUERY_PARAM = 'lang';
+
+/** Short alias for {@link LANGUAGE_QUERY_PARAM}. */
+export const LANGUAGE_QUERY_PARAM_ALIAS = 'l';
+
+export const LANGUAGE_QUERY_PARAMS = [
+  LANGUAGE_QUERY_PARAM,
+  LANGUAGE_QUERY_PARAM_ALIAS,
+];
+
+/** Header `nestjs-i18n`'s `HeaderResolver` reads. */
+export const LANGUAGE_HEADER = 'x-lang';
+
+export const SUPPORTED_LANGUAGES_LABEL = SUPPORTED_LANGUAGES.join(' / ');

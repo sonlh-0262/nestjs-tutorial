@@ -8,7 +8,7 @@ import { DataSource } from 'typeorm';
 
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/config/app-setup';
-import { AppConfig } from '../src/config/configuration';
+import { APP_CONFIG_KEY, AppConfig } from '../src/config/configuration';
 import { User } from '../src/users/entities/user.entity';
 
 interface UserEnvelope {
@@ -42,7 +42,9 @@ describe('Authentication (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
 
-    const appConfig = app.get(ConfigService).getOrThrow<AppConfig>('app');
+    const appConfig = app
+      .get(ConfigService)
+      .getOrThrow<AppConfig>(APP_CONFIG_KEY);
     configureApp(app, appConfig);
 
     app.enableShutdownHooks();

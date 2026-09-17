@@ -11,22 +11,15 @@ import { randomUUID } from 'crypto';
 import { I18nService } from 'nestjs-i18n';
 
 import { AuthConfig, AUTH_CONFIG_KEY } from '../config/auth.config';
+import { PG_UNIQUE_VIOLATION } from '../database/database.constants';
 import { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
+import { DUMMY_PASSWORD_HASH } from './auth.constants';
 import { LoginUserBodyDto } from './dto/login.dto';
 import { RegisterUserBodyDto } from './dto/register.dto';
+import { AuthenticationResult } from './interfaces/authentication-result.interface';
 import { JwtPayloadClaims } from './interfaces/jwt-payload.interface';
 import { TokenBlacklistService } from './token-blacklist.service';
-
-export const DUMMY_PASSWORD_HASH =
-  '$2b$10$18jA5vncNymIApDQRXbrwOB7ht1TAxRfCgTJV.k06jUOU18IWZl5e';
-
-const PG_UNIQUE_VIOLATION = '23505';
-
-export interface AuthenticationResult {
-  user: User;
-  token: string;
-}
 
 @Injectable()
 export class AuthService {
