@@ -22,3 +22,5 @@ export const PASSWORD_HASH_MAX_LENGTH = 255;
 
 /** Maximum length of the profile image URL. */
 export const IMAGE_URL_MAX_LENGTH = 512;
+
+export const BIO_MAX_LENGTH = 1000;

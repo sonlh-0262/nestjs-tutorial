@@ -35,3 +35,11 @@ export const MAX_REDIS_DB_INDEX = 15;
 /** Range bcrypt itself accepts for the cost factor. */
 export const MIN_BCRYPT_SALT_ROUNDS = 4;
 export const MAX_BCRYPT_SALT_ROUNDS = 31;
+
+/**
+ * Ceiling on `UPLOAD_MAX_FILE_SIZE_MB`.
+ *
+ * Uploads are buffered in memory until their type has been identified, so a
+ * very large limit would let a handful of concurrent requests exhaust the heap.
+ */
+export const MAX_UPLOAD_SIZE_MB = 25;

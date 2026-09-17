@@ -45,9 +45,8 @@ Thumbs.db
 /tmp
 /temp
 
-# Uploaded files (used from Pull 3 onwards)
+# Uploaded files
 /uploads
-/public/uploads
 
 # Project planning notes (internal, not part of the deliverable)
 plan.txt

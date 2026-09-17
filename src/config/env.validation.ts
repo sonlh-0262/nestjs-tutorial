@@ -6,6 +6,7 @@ import {
   MAX_BCRYPT_SALT_ROUNDS,
   MAX_PORT,
   MAX_REDIS_DB_INDEX,
+  MAX_UPLOAD_SIZE_MB,
   MIN_BCRYPT_SALT_ROUNDS,
   MIN_JWT_SECRET_LENGTH,
   MIN_PORT,
@@ -46,6 +47,9 @@ export interface EnvironmentVariables {
   JWT_EXPIRES_IN?: string;
   JWT_ISSUER?: string;
   BCRYPT_SALT_ROUNDS?: number;
+
+  UPLOAD_DIR?: string;
+  UPLOAD_MAX_FILE_SIZE_MB?: number;
 }
 
 export const envValidationSchema = Joi.object<EnvironmentVariables>({
@@ -89,5 +93,11 @@ export const envValidationSchema = Joi.object<EnvironmentVariables>({
   BCRYPT_SALT_ROUNDS: Joi.number()
     .min(MIN_BCRYPT_SALT_ROUNDS)
     .max(MAX_BCRYPT_SALT_ROUNDS)
+    .optional(),
+
+  UPLOAD_DIR: Joi.string().min(1).optional(),
+  UPLOAD_MAX_FILE_SIZE_MB: Joi.number()
+    .greater(0)
+    .max(MAX_UPLOAD_SIZE_MB)
     .optional(),
 }).unknown(true);
