@@ -5,9 +5,10 @@ import { PassportModule } from '@nestjs/passport';
 
 import { AuthConfig, AUTH_CONFIG_KEY } from '../config/auth.config';
 import { UsersModule } from '../users/users.module';
+import { JWT_STRATEGY_NAME } from './auth.constants';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { JwtStrategy, JWT_STRATEGY_NAME } from './strategies/jwt.strategy';
+import { JwtStrategy } from './strategies/jwt.strategy';
 import { TokenBlacklistService } from './token-blacklist.service';
 
 @Module({

@@ -1,18 +1,23 @@
 import * as Joi from 'joi';
 
 import { SUPPORTED_LANGUAGES } from '../common/constants/languages';
+import {
+  JWT_DURATION_PATTERN,
+  MAX_BCRYPT_SALT_ROUNDS,
+  MAX_PORT,
+  MAX_REDIS_DB_INDEX,
+  MAX_UPLOAD_SIZE_MB,
+  MIN_BCRYPT_SALT_ROUNDS,
+  MIN_JWT_SECRET_LENGTH,
+  MIN_PORT,
+  MIN_REDIS_DB_INDEX,
+} from './config.constants';
 
 export enum Environment {
   Development = 'development',
   Production = 'production',
   Test = 'test',
 }
-
-export const MIN_JWT_SECRET_LENGTH = 32;
-
-export const JWT_DURATION_PATTERN = /^\d+(ms|s|m|h|d|w|y)?$/;
-
-export const MAX_UPLOAD_SIZE_MB = 25;
 
 export interface EnvironmentVariables {
   NODE_ENV?: Environment;
@@ -51,7 +56,7 @@ export const envValidationSchema = Joi.object<EnvironmentVariables>({
   NODE_ENV: Joi.string()
     .valid(...Object.values(Environment))
     .optional(),
-  PORT: Joi.number().min(1).max(65535).optional(),
+  PORT: Joi.number().min(MIN_PORT).max(MAX_PORT).optional(),
   APP_NAME: Joi.string().min(1).optional(),
   API_PREFIX: Joi.string().allow('').optional(),
   FALLBACK_LANGUAGE: Joi.string()
@@ -61,7 +66,7 @@ export const envValidationSchema = Joi.object<EnvironmentVariables>({
   SWAGGER_ENABLED: Joi.string().valid('true', 'false').optional(),
 
   DB_HOST: Joi.string().min(1).optional(),
-  DB_PORT: Joi.number().min(1).max(65535).optional(),
+  DB_PORT: Joi.number().min(MIN_PORT).max(MAX_PORT).optional(),
   DB_USERNAME: Joi.string().min(1).optional(),
   DB_PASSWORD: Joi.string().allow('').optional(),
   DB_DATABASE: Joi.string().min(1).optional(),
@@ -70,9 +75,12 @@ export const envValidationSchema = Joi.object<EnvironmentVariables>({
   DB_LOGGING: Joi.string().valid('true', 'false').optional(),
 
   REDIS_HOST: Joi.string().min(1).optional(),
-  REDIS_PORT: Joi.number().min(1).max(65535).optional(),
+  REDIS_PORT: Joi.number().min(MIN_PORT).max(MAX_PORT).optional(),
   REDIS_PASSWORD: Joi.string().allow('').optional(),
-  REDIS_DB: Joi.number().min(0).max(15).optional(),
+  REDIS_DB: Joi.number()
+    .min(MIN_REDIS_DB_INDEX)
+    .max(MAX_REDIS_DB_INDEX)
+    .optional(),
   REDIS_KEY_PREFIX: Joi.string().optional(),
 
   JWT_SECRET: Joi.string().min(MIN_JWT_SECRET_LENGTH).when('NODE_ENV', {
@@ -82,7 +90,10 @@ export const envValidationSchema = Joi.object<EnvironmentVariables>({
   }),
   JWT_EXPIRES_IN: Joi.string().pattern(JWT_DURATION_PATTERN).optional(),
   JWT_ISSUER: Joi.string().min(1).optional(),
-  BCRYPT_SALT_ROUNDS: Joi.number().min(4).max(31).optional(),
+  BCRYPT_SALT_ROUNDS: Joi.number()
+    .min(MIN_BCRYPT_SALT_ROUNDS)
+    .max(MAX_BCRYPT_SALT_ROUNDS)
+    .optional(),
 
   UPLOAD_DIR: Joi.string().min(1).optional(),
   UPLOAD_MAX_FILE_SIZE_MB: Joi.number()

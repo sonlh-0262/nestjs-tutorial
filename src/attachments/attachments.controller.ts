@@ -21,6 +21,7 @@ import {
 import { Response } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { SWAGGER_BEARER_AUTH_NAME } from '../common/constants/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
 import { AttachmentsService } from './attachments.service';
@@ -35,7 +36,7 @@ export class AttachmentsController {
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('access-token')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
   @Header('Cache-Control', 'private, max-age=86400')
   @Header('X-Content-Type-Options', 'nosniff')
   @ApiOperation({

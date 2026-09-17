@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { I18nService } from 'nestjs-i18n';
 
-import { JWT_STRATEGY_NAME } from '../strategies/jwt.strategy';
+import { JWT_STRATEGY_NAME } from '../auth.constants';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard(JWT_STRATEGY_NAME) {

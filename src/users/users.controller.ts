@@ -27,6 +27,7 @@ import { I18nService } from 'nestjs-i18n';
 
 import { SUPPORTED_IMAGE_MIME_TYPES } from '../attachments/storage/image-type';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { SWAGGER_BEARER_AUTH_NAME } from '../common/constants/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { toUserResponse, UserResponseDto } from './dto/user.dto';
 import { UpdateUserBodyDto, UpdateUserDto } from './dto/update-user.dto';
@@ -46,7 +47,7 @@ export class UsersController {
 
   @Get()
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('access-token')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
   @ApiOperation({
     summary: 'Get current user',
     description:
@@ -64,7 +65,7 @@ export class UsersController {
   @Put()
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor(AVATAR_FIELD))
-  @ApiBearerAuth('access-token')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
   @ApiConsumes('application/json', 'multipart/form-data')
   @ApiOperation({
     summary: 'Update current user',

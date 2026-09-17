@@ -9,13 +9,8 @@ import {
 } from '../attachments/attachments.service';
 import { UpdateUserBodyDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
+import { CreateUserInput } from './interfaces/create-user-input.interface';
 import { PasswordService } from './password.service';
-
-export interface CreateUserInput {
-  username: string;
-  email: string;
-  passwordHash: string;
-}
 
 interface AvatarOutcome {
   url?: string | null;

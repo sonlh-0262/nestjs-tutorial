@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { I18nService } from 'nestjs-i18n';
 
 import { DEFAULT_LANGUAGE } from './common/constants/languages';
-import { AppConfig } from './config/configuration';
+import { APP_CONFIG_KEY, AppConfig } from './config/configuration';
 import { HealthResponseDto } from './dto/health-response.dto';
 import { HelloResponseDto } from './dto/hello-response.dto';
 
@@ -43,7 +43,7 @@ export class AppService {
     }
 
     return (
-      this.configService.get<AppConfig>('app')?.fallbackLanguage ??
+      this.configService.get<AppConfig>(APP_CONFIG_KEY)?.fallbackLanguage ??
       DEFAULT_LANGUAGE
     );
   }

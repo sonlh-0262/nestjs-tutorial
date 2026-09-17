@@ -2,8 +2,10 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
 
 import { REDIS_CLIENT } from '../redis/redis.constants';
-
-const KEY_PREFIX = 'auth:denylist:';
+import {
+  TOKEN_DENYLIST_KEY_PREFIX,
+  TOKEN_DENYLIST_VALUE,
+} from './auth.constants';
 
 @Injectable()
 export class TokenBlacklistService {
@@ -18,7 +20,7 @@ export class TokenBlacklistService {
       return false;
     }
 
-    await this.redis.set(this.key(jti), '1', 'EX', ttlSeconds);
+    await this.redis.set(this.key(jti), TOKEN_DENYLIST_VALUE, 'EX', ttlSeconds);
     this.logger.debug(`Revoked token ${jti} for ${ttlSeconds}s`);
 
     return true;
@@ -29,6 +31,6 @@ export class TokenBlacklistService {
   }
 
   private key(jti: string): string {
-    return `${KEY_PREFIX}${jti}`;
+    return `${TOKEN_DENYLIST_KEY_PREFIX}${jti}`;
   }
 }

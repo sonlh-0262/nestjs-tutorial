@@ -1,4 +1,5 @@
-import { MIN_JWT_SECRET_LENGTH, envValidationSchema } from './env.validation';
+import { MIN_JWT_SECRET_LENGTH } from './config.constants';
+import { envValidationSchema } from './env.validation';
 
 const VALID_SECRET = 'x'.repeat(MIN_JWT_SECRET_LENGTH);
 

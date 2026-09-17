@@ -4,7 +4,7 @@ import { NestFactory } from '@nestjs/core';
 
 import { AppModule } from './app.module';
 import { configureApp } from './config/app-setup';
-import { AppConfig } from './config/configuration';
+import { APP_CONFIG_KEY, AppConfig } from './config/configuration';
 import { setupSwagger } from './config/swagger';
 
 async function bootstrap(): Promise<void> {
@@ -16,7 +16,7 @@ async function bootstrap(): Promise<void> {
   });
 
   const configService = app.get(ConfigService);
-  const appConfig = configService.getOrThrow<AppConfig>('app');
+  const appConfig = configService.getOrThrow<AppConfig>(APP_CONFIG_KEY);
 
   configureApp(app, appConfig);
   setupSwagger(app, appConfig);

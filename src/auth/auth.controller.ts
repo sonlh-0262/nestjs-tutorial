@@ -17,16 +17,15 @@ import {
 } from '@nestjs/swagger';
 import { I18nService } from 'nestjs-i18n';
 
-import {
-  CurrentToken,
-  TokenIdentity,
-} from '../common/decorators/current-user.decorator';
+import { SWAGGER_BEARER_AUTH_NAME } from '../common/constants/swagger';
+import { CurrentToken } from '../common/decorators/current-user.decorator';
 import { toUserResponse, UserResponseDto } from '../users/dto/user.dto';
 import { AuthService } from './auth.service';
 import { LoginUserDto } from './dto/login.dto';
 import { LogoutResponseDto } from './dto/logout-response.dto';
 import { RegisterUserDto } from './dto/register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { TokenIdentity } from './interfaces/token-identity.interface';
 
 @ApiTags('Auth')
 @Controller('users')
@@ -65,7 +64,7 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('access-token')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
   @ApiOperation({
     summary: 'Log out',
     description:

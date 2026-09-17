@@ -6,7 +6,7 @@ import { App } from 'supertest/types';
 
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/config/app-setup';
-import { AppConfig } from '../src/config/configuration';
+import { APP_CONFIG_KEY, AppConfig } from '../src/config/configuration';
 import { setupSwagger } from '../src/config/swagger';
 import { HealthResponseDto } from '../src/dto/health-response.dto';
 import { HelloResponseDto } from '../src/dto/hello-response.dto';
@@ -31,7 +31,9 @@ describe('AppController (e2e)', () => {
 
     // Same pipes/filters/Swagger as `main.ts`, so these tests exercise the
     // application exactly as it runs in production.
-    const appConfig = app.get(ConfigService).getOrThrow<AppConfig>('app');
+    const appConfig = app
+      .get(ConfigService)
+      .getOrThrow<AppConfig>(APP_CONFIG_KEY);
     configureApp(app, appConfig);
     setupSwagger(app, {
       ...appConfig,

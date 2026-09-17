@@ -21,6 +21,7 @@ import {
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { SWAGGER_BEARER_AUTH_NAME } from '../common/constants/swagger';
 import {
   CurrentUser,
   OptionalCurrentUser,
@@ -36,7 +37,7 @@ export class ProfilesController {
 
   @Get(':username')
   @UseGuards(OptionalJwtAuthGuard)
-  @ApiBearerAuth('access-token')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
   @ApiOperation({
     summary: 'Get profile',
     description:
@@ -60,7 +61,7 @@ export class ProfilesController {
   @Post(':username/follow')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('access-token')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
   @ApiOperation({
     summary: 'Follow user',
     description:
@@ -86,7 +87,7 @@ export class ProfilesController {
   @Delete(':username/follow')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('access-token')
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
   @ApiOperation({
     summary: 'Unfollow user',
     description:

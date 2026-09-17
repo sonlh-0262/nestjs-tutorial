@@ -1,6 +1,7 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
 import { AuthenticatedUser } from '../../auth/interfaces/authenticated-user.interface';
+import { TokenIdentity } from '../../auth/interfaces/token-identity.interface';
 import { User } from '../../users/entities/user.entity';
 
 function authenticated(
@@ -26,8 +27,3 @@ export const CurrentToken = createParamDecorator(
     return { jti, expiresAt };
   },
 );
-
-export interface TokenIdentity {
-  jti: string;
-  expiresAt: number;
-}
