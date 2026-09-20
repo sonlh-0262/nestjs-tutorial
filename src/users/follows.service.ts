@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { I18nService } from 'nestjs-i18n';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 
 import { UserFollow } from './entities/user-follow.entity';
 
@@ -43,6 +43,22 @@ export class FollowsService {
 
   isFollowing(followerId: string, followingId: string): Promise<boolean> {
     return this.followsRepository.existsBy({ followerId, followingId });
+  }
+
+  async followingAmong(
+    followerId: string,
+    followingIds: string[],
+  ): Promise<Set<string>> {
+    if (followingIds.length === 0) {
+      return new Set();
+    }
+
+    const rows = await this.followsRepository.find({
+      where: { followerId, followingId: In(followingIds) },
+      select: { followingId: true },
+    });
+
+    return new Set(rows.map((row) => row.followingId));
   }
 
   private assertNotSelf(followerId: string, followingId: string): void {

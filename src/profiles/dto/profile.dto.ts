@@ -32,16 +32,18 @@ export class ProfileResponseDto {
   profile: ProfileDto;
 }
 
+export function toProfileDto(user: User, following: boolean): ProfileDto {
+  return {
+    username: user.username,
+    bio: user.bio,
+    image: user.image,
+    following,
+  };
+}
+
 export function toProfileResponse(
   user: User,
   following: boolean,
 ): ProfileResponseDto {
-  return {
-    profile: {
-      username: user.username,
-      bio: user.bio,
-      image: user.image,
-      following,
-    },
-  };
+  return { profile: toProfileDto(user, following) };
 }

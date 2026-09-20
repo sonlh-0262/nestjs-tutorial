@@ -19,6 +19,7 @@ describe('FollowsService', () => {
     createQueryBuilder: jest.fn(() => ({ insert: insertMock })),
     delete: jest.fn().mockResolvedValue({ affected: 1 }),
     existsBy: jest.fn().mockResolvedValue(false),
+    find: jest.fn().mockResolvedValue([]),
   };
 
   const i18nMock = { t: jest.fn((key: string) => key) };
@@ -38,6 +39,7 @@ describe('FollowsService', () => {
   afterEach(() => {
     jest.clearAllMocks();
     repositoryMock.existsBy.mockResolvedValue(false);
+    repositoryMock.find.mockResolvedValue([]);
   });
 
   describe('follow', () => {
@@ -113,6 +115,36 @@ describe('FollowsService', () => {
         followerId: 'a',
         followingId: 'b',
       });
+    });
+  });
+
+  describe('followingAmong', () => {
+    it('does not query for an empty list', async () => {
+      await expect(service.followingAmong('a', [])).resolves.toEqual(new Set());
+
+      expect(repositoryMock.find).not.toHaveBeenCalled();
+    });
+
+    it('answers for a whole batch in one query', async () => {
+      repositoryMock.find.mockResolvedValue([{ followingId: 'c' }]);
+
+      const following = await service.followingAmong('a', ['b', 'c']);
+
+      expect(repositoryMock.find).toHaveBeenCalledTimes(1);
+      expect(following.has('c')).toBe(true);
+      expect(following.has('b')).toBe(false);
+    });
+
+    it('agrees with isFollowing for a single id', async () => {
+      repositoryMock.find.mockResolvedValue([{ followingId: 'b' }]);
+      repositoryMock.existsBy.mockResolvedValue(true);
+
+      const [batch, single] = await Promise.all([
+        service.followingAmong('a', ['b']),
+        service.isFollowing('a', 'b'),
+      ]);
+
+      expect(batch.has('b')).toBe(single);
     });
   });
 });

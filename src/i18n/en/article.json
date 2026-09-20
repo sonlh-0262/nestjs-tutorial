@@ -1,0 +1,5 @@
+{
+  "NOT_FOUND": "No article with that slug",
+  "FORBIDDEN": "You can only change articles you wrote",
+  "SLUG_CONFLICT": "Could not find a free slug for that title, please try a different one"
+}
