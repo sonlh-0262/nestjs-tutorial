@@ -1,0 +1,6 @@
+{
+  "NOT_FOUND": "No such attachment",
+  "FORBIDDEN": "You are not allowed to access this file",
+  "UNSUPPORTED_TYPE": "The uploaded file is not a supported image ({types})",
+  "IMAGE_CONFLICT": "Send either an avatar file or an image URL, not both"
+}

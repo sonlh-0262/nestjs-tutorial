@@ -1,0 +1,4 @@
+{
+  "NOT_FOUND": "No user with that username",
+  "CANNOT_FOLLOW_SELF": "You cannot follow or unfollow yourself"
+}

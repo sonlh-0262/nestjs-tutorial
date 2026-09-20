@@ -40,3 +40,6 @@ docker-compose*.yml
 
 # Internal planning notes
 plan.txt
+
+# Uploaded files belong to the runtime, not the image
+uploads

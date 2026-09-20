@@ -18,5 +18,9 @@ services:
       REDIS_PORT: 6379
     ports: !override
       - '${PORT:-3000}:3000'
-    volumes: !override []
+    volumes: !override
+      - uploads-data:/usr/src/app/uploads
     command: !override ['node', 'dist/main']
+
+volumes:
+  uploads-data:
