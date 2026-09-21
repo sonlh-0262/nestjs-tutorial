@@ -14,6 +14,7 @@ import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
 } from '../../auth/auth.constants';
+import { trim, trimLower } from '../../common/transforms/trim';
 import {
   EMAIL_MAX_LENGTH,
   USERNAME_MAX_LENGTH,
@@ -38,9 +39,7 @@ export class UserCredentialsDto {
   @Matches(USERNAME_PATTERN, {
     message: i18nValidationMessage('validation.USERNAME_FORMAT'),
   })
-  @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
+  @Transform(trim)
   username: string;
 
   @ApiProperty({
@@ -52,9 +51,7 @@ export class UserCredentialsDto {
   @MaxLength(EMAIL_MAX_LENGTH, {
     message: i18nValidationMessage('validation.MAX_LENGTH'),
   })
-  @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim().toLowerCase() : value,
-  )
+  @Transform(trimLower)
   email: string;
 
   @ApiProperty({

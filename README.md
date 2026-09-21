@@ -32,6 +32,14 @@
 | GET    | `/profiles/:username`        | optional | Public profile, with `following` for the caller         |
 | POST   | `/profiles/:username/follow` | yes      | Follow a user (idempotent)                              |
 | DELETE | `/profiles/:username/follow` | yes      | Unfollow a user (idempotent)                            |
+| POST   | `/articles`                  | yes      | Create an article                                       |
+| GET    | `/articles`                  | optional | List articles, newest first, filtered and paged         |
+| GET    | `/articles/feed`             | yes      | Articles by the users you follow                        |
+| GET    | `/articles/:slug`            | optional | Get one article                                         |
+| PUT    | `/articles/:slug`            | yes      | Update your own article                                 |
+| DELETE | `/articles/:slug`            | yes      | Delete your own article (`204`)                         |
+| POST   | `/articles/:slug/favorite`   | yes      | Favorite an article (idempotent)                        |
+| DELETE | `/articles/:slug/favorite`   | yes      | Unfavorite an article (idempotent)                      |
 | GET    | `/attachments/:id`           | yes      | Download a stored file, e.g. an avatar                  |
 | GET    | `/api`                       | —        | Swagger UI                                              |
 | GET    | `/api-json`                  | —        | Raw OpenAPI JSON document                               |
@@ -78,6 +86,31 @@ curl http://localhost:3000/profiles/jake -H "Authorization: Token $TOKEN"
 # Follow and unfollow
 curl -X POST   http://localhost:3000/profiles/jake/follow -H "Authorization: Token $TOKEN"
 curl -X DELETE http://localhost:3000/profiles/jake/follow -H "Authorization: Token $TOKEN"
+
+# Create an article - the slug comes back in the response
+curl -X POST http://localhost:3000/articles \
+  -H "Authorization: Token $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"article":{"title":"How to train your dragon","description":"Ever wonder how?","body":"It takes a Jacobian","tagList":["dragons","training"]}}'
+
+# List, filter and page. All filters combine with AND.
+curl 'http://localhost:3000/articles?limit=20&offset=0'
+curl 'http://localhost:3000/articles?tag=dragons'
+curl 'http://localhost:3000/articles?author=jake'
+curl 'http://localhost:3000/articles?favorited=jake'
+
+# Your feed - articles by the people you follow
+curl http://localhost:3000/articles/feed -H "Authorization: Token $TOKEN"
+
+# Read, update and delete one article
+curl http://localhost:3000/articles/how-to-train-your-dragon
+curl -X PUT http://localhost:3000/articles/how-to-train-your-dragon \
+  -H "Authorization: Token $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"article":{"body":"With two hands"}}'
+curl -X DELETE http://localhost:3000/articles/how-to-train-your-dragon -H "Authorization: Token $TOKEN"
+
+# Favorite and unfavorite
+curl -X POST   http://localhost:3000/articles/how-to-train-your-dragon/favorite -H "Authorization: Token $TOKEN"
+curl -X DELETE http://localhost:3000/articles/how-to-train-your-dragon/favorite -H "Authorization: Token $TOKEN"
 ```
 
 ### How logout works
@@ -203,7 +236,18 @@ src/
 ├── profiles/
 │   ├── profiles.controller.ts # GET /profiles/:username, follow, unfollow
 │   ├── profiles.service.ts    # Composes user + follow state into a profile
-│   └── dto/profile.dto.ts     # `profile` envelope
+│   └── dto/profile.dto.ts     # `profile` envelope, also the article author
+├── articles/
+│   ├── articles.controller.ts # CRUD, feed, favorite / unfavorite
+│   ├── articles.service.ts    # Article reads and writes, slug allocation
+│   ├── article-view.service.ts # Batches the per-page, per-viewer fields
+│   ├── favorites.service.ts   # The article_favorites edge table
+│   ├── tags.service.ts        # Normalises and upserts tags
+│   ├── slug.ts                # slugify + collision discriminator
+│   ├── articles.constants.ts  # Field limits and the slug budget
+│   ├── dto/                   # Article envelope, create/update, list filters
+│   ├── interfaces/            # ArticleViewFlags
+│   └── entities/              # Article, Tag, ArticleFavorite
 ├── attachments/
 │   ├── attachments.controller.ts   # GET /attachments/:id (authenticated)
 │   ├── attachments.service.ts      # Stores/replaces files, read policies
@@ -223,8 +267,11 @@ src/
 │   └── redis.constants.ts
 ├── common/
 │   ├── constants/languages.ts # Supported languages (single source of truth)
+│   ├── constants/pagination.ts # Page-size bounds shared by list endpoints
 │   ├── decorators/            # @CurrentUser()
 │   ├── dto/lang-query.dto.ts  # Base query DTO allowing ?lang / ?l
+│   ├── dto/pagination-query.dto.ts # Base query DTO adding limit / offset
+│   ├── transforms/trim.ts     # @Transform handlers shared by request DTOs
 │   └── resolvers/             # Accept-Language alias resolver
 ├── config/
 │   ├── app-setup.ts           # Pipes/filters shared by main.ts and e2e tests

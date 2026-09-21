@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { randomUUID } from 'crypto';
 import { I18nService } from 'nestjs-i18n';
 
-import { PG_UNIQUE_VIOLATION } from '../database/database.constants';
+import { isUniqueViolation } from '../database/is-unique-violation';
 import { User } from '../users/entities/user.entity';
 import { PasswordService } from '../users/password.service';
 import { UsersService } from '../users/users.service';
@@ -92,20 +92,4 @@ export class AuthService {
 
     return this.jwtService.sign(claims, { jwtid: randomUUID() });
   }
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) {
-    return false;
-  }
-
-  const candidate = error as {
-    code?: unknown;
-    driverError?: { code?: unknown };
-  };
-
-  return (
-    candidate.code === PG_UNIQUE_VIOLATION ||
-    candidate.driverError?.code === PG_UNIQUE_VIOLATION
-  );
 }
