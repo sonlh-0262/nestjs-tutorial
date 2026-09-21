@@ -12,7 +12,6 @@ import { DEFAULT_PAGE_LIMIT } from '../common/constants/pagination';
 import { PG_UNIQUE_VIOLATION } from '../database/database.constants';
 import { UserFollow } from '../users/entities/user-follow.entity';
 import { User } from '../users/entities/user.entity';
-import { UsersService } from '../users/users.service';
 import { ArticleViewService } from './article-view.service';
 import { SLUG_ATTEMPT_LIMIT } from './articles.constants';
 import { ArticlesService } from './articles.service';
@@ -105,10 +104,6 @@ describe('ArticlesService', () => {
     ),
   };
 
-  const usersServiceMock = {
-    findByUsername: jest.fn().mockResolvedValue(null),
-  };
-
   const tagsServiceMock = { resolve: jest.fn().mockResolvedValue([]) };
 
   const favoritesServiceMock = {
@@ -133,7 +128,6 @@ describe('ArticlesService', () => {
           provide: getRepositoryToken(Article),
           useValue: articlesRepositoryMock,
         },
-        { provide: UsersService, useValue: usersServiceMock },
         { provide: TagsService, useValue: tagsServiceMock },
         { provide: FavoritesService, useValue: favoritesServiceMock },
         { provide: ArticleViewService, useValue: viewMock },
@@ -149,7 +143,6 @@ describe('ArticlesService', () => {
     jest.clearAllMocks();
     getManyAndCountMock.mockResolvedValue([[], 0]);
     articlesRepositoryMock.findOne.mockResolvedValue(null);
-    usersServiceMock.findByUsername.mockResolvedValue(null);
     tagsServiceMock.resolve.mockResolvedValue([]);
     transactionRepositoryMock.save.mockImplementation((input: Article) =>
       Promise.resolve(input),
@@ -305,48 +298,48 @@ describe('ArticlesService', () => {
       );
     });
 
-    it('resolves an author filter to an id before querying', async () => {
-      usersServiceMock.findByUsername.mockResolvedValue(author);
-
+    it('filters on the author alias already joined by the base query', async () => {
       await service.list({ author: 'jake' });
 
       expect(builderMock.andWhere).toHaveBeenCalledWith(
-        'article.authorId = :authorId',
-        { authorId: 'jake-id' },
+        'author.username = :author',
+        { author: 'jake' },
       );
     });
 
-    it('joins article_favorites for a favorited filter', async () => {
-      usersServiceMock.findByUsername.mockResolvedValue(author);
-
+    it('joins article_favorites and users for a favorited filter', async () => {
       await service.list({ favorited: 'jake' });
 
       expect(builderMock.innerJoin).toHaveBeenCalledWith(
         ArticleFavorite,
         'filterFavorite',
-        expect.stringContaining('filterFavorite.userId = :favoritedById'),
-        { favoritedById: 'jake-id' },
+        'filterFavorite.articleId = article.id',
+      );
+      expect(builderMock.innerJoin).toHaveBeenCalledWith(
+        User,
+        'filterFavoriter',
+        expect.stringContaining('filterFavoriter.username = :favorited'),
+        { favorited: 'jake' },
       );
     });
 
-    it('returns an empty page for an author nobody has, without querying', async () => {
+    it('lets the join decide a username nobody has, with no extra query', async () => {
       const response = await service.list({ author: 'ghost' });
 
       expect(response).toEqual({ articles: [], articlesCount: 0 });
-      expect(articlesRepositoryMock.createQueryBuilder).not.toHaveBeenCalled();
+      expect(articlesRepositoryMock.createQueryBuilder).toHaveBeenCalledTimes(
+        1,
+      );
     });
 
-    it('returns an empty page for a favorited username nobody has', async () => {
-      const response = await service.list({ favorited: 'ghost' });
+    it('combines every filter on one builder', async () => {
+      await service.list({ tag: 'dragons', author: 'jake', favorited: 'bob' });
 
-      expect(response).toEqual({ articles: [], articlesCount: 0 });
-      expect(articlesRepositoryMock.createQueryBuilder).not.toHaveBeenCalled();
-    });
-
-    it('does not look up users when no username filter is sent', async () => {
-      await service.list({ tag: 'dragons' });
-
-      expect(usersServiceMock.findByUsername).not.toHaveBeenCalled();
+      expect(articlesRepositoryMock.createQueryBuilder).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(builderMock.innerJoin).toHaveBeenCalledTimes(3);
+      expect(builderMock.andWhere).toHaveBeenCalledTimes(1);
     });
 
     it('reports the unpaginated total', async () => {

@@ -129,11 +129,16 @@ describe('ArticleViewService', () => {
       expect(article.author.following).toBe(true);
     });
 
-    it('skips the viewer queries entirely when anonymous', async () => {
+    it('asks the batch lookups for no viewer when anonymous', async () => {
       await service.one(buildArticle());
 
-      expect(favoritesServiceMock.favoritedBy).not.toHaveBeenCalled();
-      expect(followsServiceMock.followingAmong).not.toHaveBeenCalled();
+      expect(favoritesServiceMock.favoritedBy).toHaveBeenCalledWith(undefined, [
+        'article-1',
+      ]);
+      expect(followsServiceMock.followingAmong).toHaveBeenCalledWith(
+        undefined,
+        ['jake-id'],
+      );
     });
   });
 

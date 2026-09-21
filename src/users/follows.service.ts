@@ -46,10 +46,10 @@ export class FollowsService {
   }
 
   async followingAmong(
-    followerId: string,
+    followerId: string | undefined,
     followingIds: string[],
-  ): Promise<Set<string>> {
-    if (followingIds.length === 0) {
+  ): Promise<ReadonlySet<string>> {
+    if (!followerId || followingIds.length === 0) {
       return new Set();
     }
 

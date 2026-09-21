@@ -17,3 +17,5 @@ export const SLUG_SUFFIX_LENGTH = 6;
 export const SLUG_ATTEMPT_LIMIT = 5;
 
 export const SLUG_BASE_MAX_LENGTH = SLUG_MAX_LENGTH - SLUG_SUFFIX_LENGTH - 1;
+
+export const SLUG_PARAM = { name: 'slug', example: 'how-to-train-your-dragon' };

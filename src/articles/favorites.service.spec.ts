@@ -126,6 +126,14 @@ describe('FavoritesService', () => {
       expect(repositoryMock.find).not.toHaveBeenCalled();
     });
 
+    it('does not query for an anonymous viewer', async () => {
+      await expect(
+        service.favoritedBy(undefined, ['article-1']),
+      ).resolves.toEqual(new Set());
+
+      expect(repositoryMock.find).not.toHaveBeenCalled();
+    });
+
     it('returns the subset this user favorited, in one query', async () => {
       repositoryMock.find.mockResolvedValue([{ articleId: 'article-2' }]);
 

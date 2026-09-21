@@ -1,0 +1,4 @@
+{
+  "NOT_FOUND": "No comment with that id on this article",
+  "FORBIDDEN": "You can only delete comments you wrote"
+}

@@ -48,10 +48,10 @@ export class FavoritesService {
   }
 
   async favoritedBy(
-    userId: string,
+    userId: string | undefined,
     articleIds: string[],
-  ): Promise<Set<string>> {
-    if (articleIds.length === 0) {
+  ): Promise<ReadonlySet<string>> {
+    if (!userId || articleIds.length === 0) {
       return new Set();
     }
 
