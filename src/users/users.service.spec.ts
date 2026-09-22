@@ -10,6 +10,7 @@ import { PasswordService } from './password.service';
 import { UsersService } from './users.service';
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const TIMESTAMP = new Date('2026-01-01T00:00:00.000Z');
 
 const buildUser = (overrides: Partial<User> = {}): User =>
   ({
@@ -18,8 +19,8 @@ const buildUser = (overrides: Partial<User> = {}): User =>
     username: 'jake',
     bio: null,
     image: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: TIMESTAMP,
+    updatedAt: TIMESTAMP,
     ...overrides,
   }) as User;
 

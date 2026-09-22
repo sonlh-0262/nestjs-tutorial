@@ -1,64 +1,28 @@
-import { INestApplication } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Test, TestingModule } from '@nestjs/testing';
-import { randomUUID } from 'crypto';
 import request from 'supertest';
-import { App } from 'supertest/types';
-import { DataSource } from 'typeorm';
 
-import { AppModule } from '../src/app.module';
-import { configureApp } from '../src/config/app-setup';
-import { APP_CONFIG_KEY, AppConfig } from '../src/config/configuration';
 import { User } from '../src/users/entities/user.entity';
-
-interface UserEnvelope {
-  user: {
-    email: string;
-    username: string;
-    bio: string | null;
-    image: string | null;
-    token?: string;
-  };
-}
-
-const buildCredentials = () => {
-  const suffix = randomUUID().slice(0, 8);
-
-  return {
-    username: `user_${suffix}`,
-    email: `user_${suffix}@example.com`,
-    password: 'Sup3rS3cret!',
-  };
-};
+import { buildCredentials } from './support/credentials';
+import { TestContext } from './support/interfaces/test-context.interface';
+import { UserEnvelope } from './support/interfaces/user-envelope.interface';
+import { createTestApp } from './support/test-app';
 
 describe('Authentication (e2e)', () => {
-  let app: INestApplication<App>;
-  let dataSource: DataSource;
+  let ctx: TestContext;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-
-    const appConfig = app
-      .get(ConfigService)
-      .getOrThrow<AppConfig>(APP_CONFIG_KEY);
-    configureApp(app, appConfig);
-
-    app.enableShutdownHooks();
-    await app.init();
-
-    dataSource = app.get(DataSource);
+    ctx = await createTestApp();
   });
 
   afterAll(async () => {
-    await app.close();
+    await ctx.close();
+  });
+
+  afterEach(async () => {
+    await ctx.reset();
   });
 
   const register = async (credentials = buildCredentials()) => {
-    const response = await request(app.getHttpServer())
+    const response = await request(ctx.server())
       .post('/users')
       .send({ user: credentials })
       .expect(201);
@@ -72,7 +36,7 @@ describe('Authentication (e2e)', () => {
     it('creates an account and returns it with a token', async () => {
       const credentials = buildCredentials();
 
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.server())
         .post('/users')
         .send({ user: credentials })
         .expect(201);
@@ -89,7 +53,7 @@ describe('Authentication (e2e)', () => {
     it('never echoes the password or its hash', async () => {
       const credentials = buildCredentials();
 
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.server())
         .post('/users')
         .send({ user: credentials })
         .expect(201);
@@ -102,12 +66,12 @@ describe('Authentication (e2e)', () => {
 
     it('stores a bcrypt hash rather than the password', async () => {
       const credentials = buildCredentials();
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .post('/users')
         .send({ user: credentials })
         .expect(201);
 
-      const stored = await dataSource
+      const stored = await ctx.dataSource
         .getRepository(User)
         .createQueryBuilder('user')
         .addSelect('user.passwordHash')
@@ -121,7 +85,7 @@ describe('Authentication (e2e)', () => {
     it('lower-cases the email before storing it', async () => {
       const credentials = buildCredentials();
 
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.server())
         .post('/users')
         .send({
           user: { ...credentials, email: credentials.email.toUpperCase() },
@@ -136,7 +100,7 @@ describe('Authentication (e2e)', () => {
     it('rejects a duplicate email with 409', async () => {
       const { credentials } = await register();
 
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .post('/users')
         .send({
           user: { ...credentials, username: `${credentials.username}_2` },
@@ -147,7 +111,7 @@ describe('Authentication (e2e)', () => {
     it('treats a differently-cased email as a duplicate', async () => {
       const { credentials } = await register();
 
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .post('/users')
         .send({
           user: {
@@ -163,49 +127,49 @@ describe('Authentication (e2e)', () => {
       const { credentials } = await register();
       const other = buildCredentials();
 
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .post('/users')
         .send({ user: { ...other, username: credentials.username } })
         .expect(409);
     });
 
     it('rejects a malformed email', async () => {
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .post('/users')
         .send({ user: { ...buildCredentials(), email: 'not-an-email' } })
         .expect(400);
     });
 
     it('rejects a password shorter than 8 characters', async () => {
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .post('/users')
         .send({ user: { ...buildCredentials(), password: 'short' } })
         .expect(400);
     });
 
     it('rejects a username containing characters that are not URL safe', async () => {
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .post('/users')
         .send({ user: { ...buildCredentials(), username: 'not valid!' } })
         .expect(400);
     });
 
     it('rejects a body that is missing the `user` envelope', async () => {
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .post('/users')
         .send(buildCredentials())
         .expect(400);
     });
 
     it('rejects unknown fields inside the envelope', async () => {
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .post('/users')
         .send({ user: { ...buildCredentials(), role: 'admin' } })
         .expect(400);
     });
 
     it('translates validation errors into the requested language', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.server())
         .post('/users?lang=jp')
         .send({ user: { ...buildCredentials(), email: 'not-an-email' } })
         .expect(400);
@@ -218,7 +182,7 @@ describe('Authentication (e2e)', () => {
     it('returns the user and a token for valid credentials', async () => {
       const { credentials } = await register();
 
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.server())
         .post('/users/login')
         .send({
           user: { email: credentials.email, password: credentials.password },
@@ -234,7 +198,7 @@ describe('Authentication (e2e)', () => {
     it('accepts the email in a different case', async () => {
       const { credentials } = await register();
 
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .post('/users/login')
         .send({
           user: {
@@ -248,7 +212,7 @@ describe('Authentication (e2e)', () => {
     it('rejects a wrong password with 401', async () => {
       const { credentials } = await register();
 
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .post('/users/login')
         .send({
           user: { email: credentials.email, password: 'wrong-password' },
@@ -259,12 +223,12 @@ describe('Authentication (e2e)', () => {
     it('answers an unknown email exactly like a wrong password', async () => {
       const { credentials } = await register();
 
-      const unknown = await request(app.getHttpServer())
+      const unknown = await request(ctx.server())
         .post('/users/login')
         .send({ user: { email: 'nobody@example.com', password: 'whatever' } })
         .expect(401);
 
-      const wrongPassword = await request(app.getHttpServer())
+      const wrongPassword = await request(ctx.server())
         .post('/users/login')
         .send({
           user: { email: credentials.email, password: 'wrong-password' },
@@ -277,7 +241,7 @@ describe('Authentication (e2e)', () => {
     });
 
     it('localises the failure message', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.server())
         .post('/users/login?lang=jp')
         .send({ user: { email: 'nobody@example.com', password: 'whatever' } })
         .expect(401);
@@ -292,7 +256,7 @@ describe('Authentication (e2e)', () => {
     it('returns the authenticated user', async () => {
       const { credentials, token } = await register();
 
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.server())
         .get('/user')
         .set('Authorization', `Token ${token}`)
         .expect(200);
@@ -306,7 +270,7 @@ describe('Authentication (e2e)', () => {
     it('accepts the `Bearer` scheme as well as `Token`', async () => {
       const { token } = await register();
 
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .get('/user')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
@@ -315,7 +279,7 @@ describe('Authentication (e2e)', () => {
     it('does not return a token', async () => {
       const { token } = await register();
 
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.server())
         .get('/user')
         .set('Authorization', `Token ${token}`)
         .expect(200);
@@ -324,18 +288,18 @@ describe('Authentication (e2e)', () => {
     });
 
     it('rejects a request with no token', async () => {
-      await request(app.getHttpServer()).get('/user').expect(401);
+      await request(ctx.server()).get('/user').expect(401);
     });
 
     it('rejects a token that was not signed by this API', async () => {
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .get('/user')
         .set('Authorization', 'Token not.a.real.token')
         .expect(401);
     });
 
     it('localises the unauthorised message', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.server())
         .get('/user?lang=jp')
         .expect(401);
 
@@ -347,17 +311,17 @@ describe('Authentication (e2e)', () => {
     it('revokes the token it was called with', async () => {
       const { token } = await register();
 
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .get('/user')
         .set('Authorization', `Token ${token}`)
         .expect(200);
 
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .post('/users/logout')
         .set('Authorization', `Token ${token}`)
         .expect(200);
 
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .get('/user')
         .set('Authorization', `Token ${token}`)
         .expect(401);
@@ -366,7 +330,7 @@ describe('Authentication (e2e)', () => {
     it('leaves other sessions of the same user signed in', async () => {
       const { credentials, token: firstToken } = await register();
 
-      const second = await request(app.getHttpServer())
+      const second = await request(ctx.server())
         .post('/users/login')
         .send({
           user: { email: credentials.email, password: credentials.password },
@@ -375,12 +339,12 @@ describe('Authentication (e2e)', () => {
 
       const secondToken = (second.body as UserEnvelope).user.token as string;
 
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .post('/users/logout')
         .set('Authorization', `Token ${firstToken}`)
         .expect(200);
 
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .get('/user')
         .set('Authorization', `Token ${secondToken}`)
         .expect(200);
@@ -389,12 +353,12 @@ describe('Authentication (e2e)', () => {
     it('lets the user log in again afterwards', async () => {
       const { credentials, token } = await register();
 
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .post('/users/logout')
         .set('Authorization', `Token ${token}`)
         .expect(200);
 
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .post('/users/login')
         .send({
           user: { email: credentials.email, password: credentials.password },
@@ -405,25 +369,25 @@ describe('Authentication (e2e)', () => {
     it('rejects logging out twice with the same token', async () => {
       const { token } = await register();
 
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .post('/users/logout')
         .set('Authorization', `Token ${token}`)
         .expect(200);
 
-      await request(app.getHttpServer())
+      await request(ctx.server())
         .post('/users/logout')
         .set('Authorization', `Token ${token}`)
         .expect(401);
     });
 
     it('rejects a logout with no token', async () => {
-      await request(app.getHttpServer()).post('/users/logout').expect(401);
+      await request(ctx.server()).post('/users/logout').expect(401);
     });
 
     it('confirms the logout in the requested language', async () => {
       const { token } = await register();
 
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.server())
         .post('/users/logout?lang=jp')
         .set('Authorization', `Token ${token}`)
         .expect(200);
@@ -436,9 +400,9 @@ describe('Authentication (e2e)', () => {
 
   describe('database schema', () => {
     it('was created by the migrations, not by synchronize', async () => {
-      expect(dataSource.options.synchronize).toBe(false);
+      expect(ctx.dataSource.options.synchronize).toBe(false);
 
-      const applied = await dataSource.query<{ name: string }[]>(
+      const applied = await ctx.dataSource.query<{ name: string }[]>(
         'SELECT name FROM migrations ORDER BY timestamp',
       );
 
@@ -451,7 +415,7 @@ describe('Authentication (e2e)', () => {
       const { credentials } = await register();
 
       await expect(
-        dataSource.getRepository(User).insert({
+        ctx.dataSource.getRepository(User).insert({
           email: credentials.email,
           username: `${credentials.username}_direct`,
           passwordHash: 'irrelevant',

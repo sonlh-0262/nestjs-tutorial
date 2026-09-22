@@ -83,7 +83,7 @@ export class AuthService {
     return revoked;
   }
 
-  private issueToken(user: User): string {
+  issueToken(user: User): string {
     const claims: JwtPayloadClaims = {
       sub: user.id,
       email: user.email,

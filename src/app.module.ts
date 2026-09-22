@@ -21,12 +21,12 @@ import {
 } from './common/constants/languages';
 import { AcceptLanguageAliasResolver } from './common/resolvers/accept-language-alias.resolver';
 import authConfig from './config/auth.config';
-import { ENV_FILE_PATHS } from './config/config.constants';
 import configuration, {
   APP_CONFIG_KEY,
   AppConfig,
 } from './config/configuration';
 import databaseConfig from './config/database.config';
+import { envFilePaths } from './config/env-files';
 import { envValidationSchema } from './config/env.validation';
 import redisConfig from './config/redis.config';
 import storageConfig from './config/storage.config';
@@ -49,7 +49,7 @@ import { UsersModule } from './users/users.module';
       ],
       validationSchema: envValidationSchema,
       validationOptions: { abortEarly: false },
-      envFilePath: ENV_FILE_PATHS,
+      envFilePath: envFilePaths(),
     }),
     I18nModule.forRootAsync({
       imports: [ConfigModule],

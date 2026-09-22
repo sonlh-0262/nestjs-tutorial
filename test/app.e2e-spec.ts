@@ -1,15 +1,9 @@
-import { INestApplication } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
-import { App } from 'supertest/types';
 
-import { AppModule } from '../src/app.module';
-import { configureApp } from '../src/config/app-setup';
-import { APP_CONFIG_KEY, AppConfig } from '../src/config/configuration';
-import { setupSwagger } from '../src/config/swagger';
 import { HealthResponseDto } from '../src/dto/health-response.dto';
 import { HelloResponseDto } from '../src/dto/hello-response.dto';
+import { TestContext } from './support/interfaces/test-context.interface';
+import { createTestApp } from './support/test-app';
 
 interface OpenApiDocument {
   info: { title: string; version: string };
@@ -20,35 +14,24 @@ const JP_HELLO = 'こんにちは世界！';
 const JP_HEALTH = 'サービスは正常に稼働しています';
 
 describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
+  let ctx: TestContext;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-
-    // Same pipes/filters/Swagger as `main.ts`, so these tests exercise the
-    // application exactly as it runs in production.
-    const appConfig = app
-      .get(ConfigService)
-      .getOrThrow<AppConfig>(APP_CONFIG_KEY);
-    configureApp(app, appConfig);
-    setupSwagger(app, {
-      ...appConfig,
-      swagger: { enabled: true, path: 'api' },
-    });
-
-    await app.init();
+    // `swagger: true` because this file is the one that asserts the OpenAPI
+    // document; every other spec skips building it.
+    ctx = await createTestApp({ swagger: true });
   });
 
   afterAll(async () => {
-    await app.close();
+    await ctx.close();
+  });
+
+  afterEach(async () => {
+    await ctx.reset();
   });
 
   const getHello = async (query = ''): Promise<HelloResponseDto> => {
-    const response = await request(app.getHttpServer()).get(`/${query}`);
+    const response = await request(ctx.server()).get(`/${query}`);
     expect(response.status).toBe(200);
     return response.body as HelloResponseDto;
   };
@@ -57,7 +40,7 @@ describe('AppController (e2e)', () => {
     header: string,
     value: string,
   ): Promise<HelloResponseDto> => {
-    const response = await request(app.getHttpServer())
+    const response = await request(ctx.server())
       .get('/')
       .set(header, value)
       .expect(200);
@@ -157,7 +140,7 @@ describe('AppController (e2e)', () => {
 
   describe('validation', () => {
     it('rejects a name longer than 50 characters', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.server())
         .get(`/?name=${'a'.repeat(51)}`)
         .expect(400);
 
@@ -165,7 +148,7 @@ describe('AppController (e2e)', () => {
     });
 
     it('translates validation errors into the requested language', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.server())
         .get(`/?name=${'a'.repeat(51)}&lang=jp`)
         .expect(400);
 
@@ -173,15 +156,13 @@ describe('AppController (e2e)', () => {
     });
 
     it('rejects unknown query parameters', async () => {
-      await request(app.getHttpServer()).get('/?unexpected=1').expect(400);
+      await request(ctx.server()).get('/?unexpected=1').expect(400);
     });
   });
 
   describe('GET /health', () => {
     it('reports the service as healthy', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/health')
-        .expect(200);
+      const response = await request(ctx.server()).get('/health').expect(200);
 
       const body = response.body as HealthResponseDto;
       expect(body.status).toBe('ok');
@@ -191,7 +172,7 @@ describe('AppController (e2e)', () => {
     });
 
     it('localises the health message', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.server())
         .get('/health?lang=jp')
         .expect(200);
 
@@ -201,9 +182,7 @@ describe('AppController (e2e)', () => {
 
   describe('swagger', () => {
     it('serves the OpenAPI JSON document', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/api-json')
-        .expect(200);
+      const response = await request(ctx.server()).get('/api-json').expect(200);
 
       const document = response.body as OpenApiDocument;
       expect(document.info.title).toBeDefined();
@@ -212,9 +191,7 @@ describe('AppController (e2e)', () => {
     });
 
     it('advertises en and jp as the supported languages', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/api-json')
-        .expect(200);
+      const response = await request(ctx.server()).get('/api-json').expect(200);
 
       const raw = JSON.stringify(response.body);
       expect(raw).toContain('"enum":["en","jp"]');

@@ -1,20 +1,16 @@
-import { INestApplication } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Test, TestingModule } from '@nestjs/testing';
 import { randomUUID } from 'crypto';
 import request from 'supertest';
-import { App } from 'supertest/types';
-import { DataSource } from 'typeorm';
 
-import { AppModule } from '../src/app.module';
 import { MAX_TAGS_PER_ARTICLE } from '../src/articles/articles.constants';
 import { ArticleFavorite } from '../src/articles/entities/article-favorite.entity';
 import { Article } from '../src/articles/entities/article.entity';
 import { Tag } from '../src/articles/entities/tag.entity';
 import { MAX_PAGE_LIMIT } from '../src/common/constants/pagination';
-import { configureApp } from '../src/config/app-setup';
-import { APP_CONFIG_KEY, AppConfig } from '../src/config/configuration';
 import { User } from '../src/users/entities/user.entity';
+import { buildCredentials } from './support/credentials';
+import { TestContext } from './support/interfaces/test-context.interface';
+import { UserEnvelope } from './support/interfaces/user-envelope.interface';
+import { createTestApp } from './support/test-app';
 
 interface ArticleBody {
   slug: string;
@@ -43,49 +39,24 @@ interface ArticlesEnvelope {
   articlesCount: number;
 }
 
-interface UserEnvelope {
-  user: { username: string; token?: string };
-}
-
-const buildCredentials = () => {
-  const suffix = randomUUID().slice(0, 8);
-
-  return {
-    username: `user_${suffix}`,
-    email: `user_${suffix}@example.com`,
-    password: 'Sup3rS3cret!',
-  };
-};
-
 const uniqueTag = () => `tag-${randomUUID().slice(0, 8)}`;
 
 describe('Articles (e2e)', () => {
-  let app: INestApplication<App>;
-  let dataSource: DataSource;
+  let ctx: TestContext;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-
-    const appConfig = app
-      .get(ConfigService)
-      .getOrThrow<AppConfig>(APP_CONFIG_KEY);
-    configureApp(app, appConfig);
-
-    app.enableShutdownHooks();
-    await app.init();
-
-    dataSource = app.get(DataSource);
+    ctx = await createTestApp();
   });
 
   afterAll(async () => {
-    await app.close();
+    await ctx.close();
   });
 
-  const server = () => app.getHttpServer();
+  afterEach(async () => {
+    await ctx.reset();
+  });
+
+  const server = () => ctx.server();
 
   const register = async () => {
     const credentials = buildCredentials();
@@ -207,7 +178,7 @@ describe('Articles (e2e)', () => {
       await createArticle(token, { tagList: [tag.toUpperCase()] });
 
       await expect(
-        dataSource.getRepository(Tag).countBy({ name: tag }),
+        ctx.dataSource.getRepository(Tag).countBy({ name: tag }),
       ).resolves.toBe(1);
     });
 
@@ -836,7 +807,7 @@ describe('Articles (e2e)', () => {
         .set('Authorization', `Token ${readerToken}`)
         .expect(200);
 
-      const articles = dataSource.getRepository(Article);
+      const articles = ctx.dataSource.getRepository(Article);
       const row = await articles.findOneOrFail({
         where: { slug: created.slug },
       });
@@ -847,13 +818,13 @@ describe('Articles (e2e)', () => {
         .expect(204);
 
       await expect(
-        dataSource
+        ctx.dataSource
           .getRepository(ArticleFavorite)
           .countBy({ articleId: row.id }),
       ).resolves.toBe(0);
 
       await expect(
-        dataSource.getRepository(Tag).countBy({ name: tag }),
+        ctx.dataSource.getRepository(Tag).countBy({ name: tag }),
       ).resolves.toBe(1);
     });
 
@@ -1064,10 +1035,10 @@ describe('Articles (e2e)', () => {
 
       const created = await createArticle(token);
 
-      await dataSource.getRepository(User).delete({ username });
+      await ctx.dataSource.getRepository(User).delete({ username });
 
       await expect(
-        dataSource.getRepository(Article).countBy({ slug: created.slug }),
+        ctx.dataSource.getRepository(Article).countBy({ slug: created.slug }),
       ).resolves.toBe(0);
     });
   });

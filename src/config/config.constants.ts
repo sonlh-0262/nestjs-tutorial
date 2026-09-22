@@ -7,13 +7,13 @@
  */
 
 /**
- * Env files loaded, in order of precedence. `.env.local` wins so a developer
- * can override the committed `.env` without touching it.
+ * Env files every environment loads, in order of precedence. `.env.local` wins
+ * so a developer can override the committed `.env` without touching it.
  *
- * Shared by the Nest app and the standalone TypeORM CLI data source, which
- * bootstraps without Nest and so has to load the same files itself.
+ * `envFilePaths()` puts the files belonging to the current `NODE_ENV` in front
+ * of these, which is how the e2e suite reaches its own database.
  */
-export const ENV_FILE_PATHS = ['.env.local', '.env'];
+export const BASE_ENV_FILE_PATHS = ['.env.local', '.env'];
 
 /** TCP port range, used for every `*_PORT` variable. */
 export const MIN_PORT = 1;
