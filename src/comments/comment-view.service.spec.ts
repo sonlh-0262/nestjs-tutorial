@@ -56,7 +56,7 @@ describe('CommentViewService', () => {
 
   describe('one', () => {
     it('renders the full comment shape', async () => {
-      const { comment } = await service.one(buildComment());
+      const { comment } = await service.toCommentResponse(buildComment());
 
       expect(comment).toEqual({
         id: 'comment-1',
@@ -73,7 +73,7 @@ describe('CommentViewService', () => {
     });
 
     it('never leaks the article id, author id or author email', async () => {
-      const { comment } = await service.one(buildComment());
+      const { comment } = await service.toCommentResponse(buildComment());
 
       expect(comment).not.toHaveProperty('articleId');
       expect(comment).not.toHaveProperty('authorId');
@@ -84,13 +84,16 @@ describe('CommentViewService', () => {
     it('reflects the viewer following the comment author', async () => {
       followsServiceMock.followingAmong.mockResolvedValue(new Set(['jake-id']));
 
-      const { comment } = await service.one(buildComment(), viewer);
+      const { comment } = await service.toCommentResponse(
+        buildComment(),
+        viewer,
+      );
 
       expect(comment.author.following).toBe(true);
     });
 
     it('asks for no viewer when anonymous', async () => {
-      await service.one(buildComment());
+      await service.toCommentResponse(buildComment());
 
       expect(followsServiceMock.followingAmong).toHaveBeenCalledWith(
         undefined,
@@ -101,14 +104,14 @@ describe('CommentViewService', () => {
 
   describe('page', () => {
     it('returns an empty page without querying', async () => {
-      const response = await service.page([], 0, viewer);
+      const response = await service.toCommentsResponse([], 0, viewer);
 
       expect(response).toEqual({ comments: [], commentsCount: 0 });
       expect(followsServiceMock.followingAmong).not.toHaveBeenCalled();
     });
 
     it('carries the total separately from the page size', async () => {
-      const response = await service.page([buildComment()], 42);
+      const response = await service.toCommentsResponse([buildComment()], 42);
 
       expect(response.comments).toHaveLength(1);
       expect(response.commentsCount).toBe(42);
@@ -119,13 +122,13 @@ describe('CommentViewService', () => {
         buildComment({ id: `comment-${index}` }),
       );
 
-      await service.page(comments, comments.length, viewer);
+      await service.toCommentsResponse(comments, comments.length, viewer);
 
       expect(followsServiceMock.followingAmong).toHaveBeenCalledTimes(1);
     });
 
     it('asks about each author once even when they wrote several comments', async () => {
-      await service.page(
+      await service.toCommentsResponse(
         [
           buildComment({ id: 'comment-1' }),
           buildComment({ id: 'comment-2' }),
@@ -144,7 +147,7 @@ describe('CommentViewService', () => {
     it('applies the flag per comment, not per page', async () => {
       followsServiceMock.followingAmong.mockResolvedValue(new Set(['jill-id']));
 
-      const { comments } = await service.page(
+      const { comments } = await service.toCommentsResponse(
         [
           buildComment({ id: 'comment-1' }),
           buildComment({

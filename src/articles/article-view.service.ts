@@ -18,21 +18,27 @@ export class ArticleViewService {
     private readonly followsService: FollowsService,
   ) {}
 
-  async one(article: Article, viewer?: User): Promise<ArticleResponseDto> {
-    const [dto] = await this.render([article], viewer);
+  async toArticleResponse(
+    article: Article,
+    viewer?: User,
+  ): Promise<ArticleResponseDto> {
+    const [dto] = await this.toDtosWithViewerFlags([article], viewer);
 
     return { article: dto };
   }
 
-  async page(
+  async toArticlesResponse(
     articles: Article[],
     articlesCount: number,
     viewer?: User,
   ): Promise<ArticlesResponseDto> {
-    return { articles: await this.render(articles, viewer), articlesCount };
+    return {
+      articles: await this.toDtosWithViewerFlags(articles, viewer),
+      articlesCount,
+    };
   }
 
-  private async render(
+  private async toDtosWithViewerFlags(
     articles: Article[],
     viewer?: User,
   ): Promise<ArticleDto[]> {

@@ -4,7 +4,6 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { I18nService } from 'nestjs-i18n';
 
 import { ArticlesService } from '../articles/articles.service';
-import { Article } from '../articles/entities/article.entity';
 import {
   DEFAULT_PAGE_LIMIT,
   DEFAULT_PAGE_OFFSET,
@@ -26,13 +25,9 @@ const buildUser = (overrides: Partial<User> = {}): User =>
     ...overrides,
   }) as User;
 
-const buildArticle = (overrides: Partial<Article> = {}): Article =>
-  ({
-    id: 'article-1',
-    slug: 'how-to-train-your-dragon',
-    authorId: 'jake-id',
-    ...overrides,
-  }) as Article;
+const ARTICLE_ID = 'article-1';
+
+const ARTICLE_SLUG = 'how-to-train-your-dragon';
 
 const buildComment = (overrides: Partial<Comment> = {}): Comment =>
   ({
@@ -60,12 +55,14 @@ describe('CommentsService', () => {
   };
 
   const articlesServiceMock = {
-    findBySlugOrFail: jest.fn().mockResolvedValue(buildArticle()),
+    findIdBySlugOrFail: jest.fn().mockResolvedValue(ARTICLE_ID),
   };
 
   const viewMock = {
-    one: jest.fn().mockResolvedValue({ comment: {} }),
-    page: jest.fn().mockResolvedValue({ comments: [], commentsCount: 0 }),
+    toCommentResponse: jest.fn().mockResolvedValue({ comment: {} }),
+    toCommentsResponse: jest
+      .fn()
+      .mockResolvedValue({ comments: [], commentsCount: 0 }),
   };
 
   const i18nMock = { t: jest.fn((key: string) => key) };
@@ -88,36 +85,39 @@ describe('CommentsService', () => {
     jest.clearAllMocks();
     repositoryMock.findOne.mockResolvedValue(buildComment());
     repositoryMock.findAndCount.mockResolvedValue([[], 0]);
-    articlesServiceMock.findBySlugOrFail.mockResolvedValue(buildArticle());
+    articlesServiceMock.findIdBySlugOrFail.mockResolvedValue(ARTICLE_ID);
   });
 
   describe('create', () => {
     it('stores the comment against the article and the caller', async () => {
-      await service.create('how-to-train-your-dragon', author, {
+      await service.create(ARTICLE_SLUG, author, {
         body: 'His name was my name too.',
       });
 
       expect(repositoryMock.create).toHaveBeenCalledWith({
         body: 'His name was my name too.',
-        articleId: 'article-1',
+        articleId: ARTICLE_ID,
         authorId: 'jake-id',
       });
       expect(repositoryMock.save).toHaveBeenCalledTimes(1);
     });
 
     it('renders with the author already attached, without re-reading it', async () => {
-      await service.create('how-to-train-your-dragon', author, {
+      await service.create(ARTICLE_SLUG, author, {
         body: 'His name was my name too.',
       });
 
-      const [comment, viewer] = viewMock.one.mock.calls[0] as [Comment, User];
+      const [comment, viewer] = viewMock.toCommentResponse.mock.calls[0] as [
+        Comment,
+        User,
+      ];
 
       expect(comment.author).toBe(author);
       expect(viewer).toBe(author);
     });
 
     it('rejects a slug nobody wrote before touching the table', async () => {
-      articlesServiceMock.findBySlugOrFail.mockRejectedValue(
+      articlesServiceMock.findIdBySlugOrFail.mockRejectedValue(
         new NotFoundException(),
       );
 
@@ -131,11 +131,19 @@ describe('CommentsService', () => {
 
   describe('list', () => {
     it('reads the article comments oldest first', async () => {
-      await service.list('how-to-train-your-dragon', {});
+      await service.list(ARTICLE_SLUG, {});
 
       expect(repositoryMock.findAndCount).toHaveBeenCalledWith({
-        where: { articleId: 'article-1' },
+        where: { articleId: ARTICLE_ID },
         relations: { author: true },
+        select: {
+          id: true,
+          body: true,
+          authorId: true,
+          createdAt: true,
+          updatedAt: true,
+          author: { id: true, username: true, bio: true, image: true },
+        },
         order: { createdAt: 'ASC', id: 'ASC' },
         take: DEFAULT_PAGE_LIMIT,
         skip: DEFAULT_PAGE_OFFSET,
@@ -143,7 +151,7 @@ describe('CommentsService', () => {
     });
 
     it('honours the page bounds it is given', async () => {
-      await service.list('how-to-train-your-dragon', { limit: 5, offset: 10 });
+      await service.list(ARTICLE_SLUG, { limit: 5, offset: 10 });
 
       expect(repositoryMock.findAndCount).toHaveBeenCalledWith(
         expect.objectContaining({ take: 5, skip: 10 }),
@@ -154,30 +162,39 @@ describe('CommentsService', () => {
       const comments = [buildComment()];
       repositoryMock.findAndCount.mockResolvedValue([comments, 42]);
 
-      await service.list('how-to-train-your-dragon', {}, author);
+      await service.list(ARTICLE_SLUG, {}, author);
 
-      expect(viewMock.page).toHaveBeenCalledWith(comments, 42, author);
+      expect(viewMock.toCommentsResponse).toHaveBeenCalledWith(
+        comments,
+        42,
+        author,
+      );
     });
 
     it('renders anonymously when there is no viewer', async () => {
-      await service.list('how-to-train-your-dragon', {});
+      await service.list(ARTICLE_SLUG, {});
 
-      expect(viewMock.page).toHaveBeenCalledWith([], 0, undefined);
+      expect(viewMock.toCommentsResponse).toHaveBeenCalledWith(
+        [],
+        0,
+        undefined,
+      );
     });
   });
 
   describe('remove', () => {
     it('deletes a comment the caller wrote', async () => {
-      await service.remove('how-to-train-your-dragon', 'comment-1', author);
+      await service.remove(ARTICLE_SLUG, 'comment-1', author);
 
       expect(repositoryMock.delete).toHaveBeenCalledWith({ id: 'comment-1' });
     });
 
     it('scopes the lookup to the article in the path', async () => {
-      await service.remove('how-to-train-your-dragon', 'comment-1', author);
+      await service.remove(ARTICLE_SLUG, 'comment-1', author);
 
       expect(repositoryMock.findOne).toHaveBeenCalledWith({
-        where: { id: 'comment-1', articleId: 'article-1' },
+        where: { id: 'comment-1', articleId: ARTICLE_ID },
+        select: { id: true, authorId: true },
       });
     });
 
@@ -185,7 +202,7 @@ describe('CommentsService', () => {
       repositoryMock.findOne.mockResolvedValue(null);
 
       await expect(
-        service.remove('how-to-train-your-dragon', 'comment-1', author),
+        service.remove(ARTICLE_SLUG, 'comment-1', author),
       ).rejects.toBeInstanceOf(NotFoundException);
 
       expect(repositoryMock.delete).not.toHaveBeenCalled();
@@ -193,7 +210,7 @@ describe('CommentsService', () => {
 
     it('403s for anyone but the comment author', async () => {
       await expect(
-        service.remove('how-to-train-your-dragon', 'comment-1', stranger),
+        service.remove(ARTICLE_SLUG, 'comment-1', stranger),
       ).rejects.toBeInstanceOf(ForbiddenException);
 
       expect(repositoryMock.delete).not.toHaveBeenCalled();
@@ -205,7 +222,7 @@ describe('CommentsService', () => {
       );
 
       await expect(
-        service.remove('how-to-train-your-dragon', 'comment-1', author),
+        service.remove(ARTICLE_SLUG, 'comment-1', author),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
   });

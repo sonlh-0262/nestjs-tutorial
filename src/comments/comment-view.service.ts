@@ -14,21 +14,27 @@ import { Comment } from './entities/comment.entity';
 export class CommentViewService {
   constructor(private readonly followsService: FollowsService) {}
 
-  async one(comment: Comment, viewer?: User): Promise<CommentResponseDto> {
-    const [dto] = await this.render([comment], viewer);
+  async toCommentResponse(
+    comment: Comment,
+    viewer?: User,
+  ): Promise<CommentResponseDto> {
+    const [dto] = await this.toDtosWithViewerFlags([comment], viewer);
 
     return { comment: dto };
   }
 
-  async page(
+  async toCommentsResponse(
     comments: Comment[],
     commentsCount: number,
     viewer?: User,
   ): Promise<CommentsResponseDto> {
-    return { comments: await this.render(comments, viewer), commentsCount };
+    return {
+      comments: await this.toDtosWithViewerFlags(comments, viewer),
+      commentsCount,
+    };
   }
 
-  private async render(
+  private async toDtosWithViewerFlags(
     comments: Comment[],
     viewer?: User,
   ): Promise<CommentDto[]> {

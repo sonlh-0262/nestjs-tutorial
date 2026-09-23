@@ -57,9 +57,9 @@ describe('ArticlesService', () => {
   const getManyAndCountMock = jest.fn().mockResolvedValue([[], 0]);
 
   type BuilderMock = Record<
-    | 'innerJoinAndSelect'
-    | 'leftJoinAndSelect'
     | 'innerJoin'
+    | 'leftJoin'
+    | 'select'
     | 'andWhere'
     | 'orderBy'
     | 'addOrderBy'
@@ -70,9 +70,9 @@ describe('ArticlesService', () => {
   >;
 
   const builderMock: BuilderMock = {
-    innerJoinAndSelect: jest.fn(() => builderMock),
-    leftJoinAndSelect: jest.fn(() => builderMock),
     innerJoin: jest.fn(() => builderMock),
+    leftJoin: jest.fn(() => builderMock),
+    select: jest.fn(() => builderMock),
     andWhere: jest.fn(() => builderMock),
     orderBy: jest.fn(() => builderMock),
     addOrderBy: jest.fn(() => builderMock),
@@ -112,8 +112,10 @@ describe('ArticlesService', () => {
   };
 
   const viewMock = {
-    one: jest.fn((article: Article) => Promise.resolve({ article })),
-    page: jest.fn((articles: Article[], articlesCount: number) =>
+    toArticleResponse: jest.fn((article: Article) =>
+      Promise.resolve({ article }),
+    ),
+    toArticlesResponse: jest.fn((articles: Article[], articlesCount: number) =>
       Promise.resolve({ articles, articlesCount }),
     ),
   };
@@ -255,7 +257,7 @@ describe('ArticlesService', () => {
         body: 'b',
       });
 
-      expect(viewMock.one).toHaveBeenCalledWith(
+      expect(viewMock.toArticleResponse).toHaveBeenCalledWith(
         expect.objectContaining({ author }),
         author,
       );
@@ -338,7 +340,7 @@ describe('ArticlesService', () => {
       expect(articlesRepositoryMock.createQueryBuilder).toHaveBeenCalledTimes(
         1,
       );
-      expect(builderMock.innerJoin).toHaveBeenCalledTimes(3);
+      expect(builderMock.innerJoin).toHaveBeenCalledTimes(4);
       expect(builderMock.andWhere).toHaveBeenCalledTimes(1);
     });
 
@@ -378,14 +380,60 @@ describe('ArticlesService', () => {
 
       await service.getBySlug('how-to-train-your-dragon');
 
-      expect(articlesRepositoryMock.findOne).toHaveBeenCalledWith({
-        where: { slug: 'how-to-train-your-dragon' },
-        relations: { author: true, tags: true },
-      });
+      expect(articlesRepositoryMock.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { slug: 'how-to-train-your-dragon' },
+          relations: { author: true, tags: true },
+        }),
+      );
+    });
+
+    it('selects only the columns the response renders', async () => {
+      articlesRepositoryMock.findOne.mockResolvedValue(buildArticle());
+
+      await service.getBySlug('how-to-train-your-dragon');
+
+      expect(articlesRepositoryMock.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            description: true,
+            body: true,
+            authorId: true,
+            createdAt: true,
+            updatedAt: true,
+            author: { id: true, username: true, bio: true, image: true },
+            tags: { id: true, name: true },
+          },
+        }),
+      );
     });
 
     it('rejects an unknown slug', async () => {
       await expect(service.getBySlug('nope')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('findIdBySlugOrFail', () => {
+    it('reads the id alone, with no relations', async () => {
+      articlesRepositoryMock.findOne.mockResolvedValue({ id: 'article-1' });
+
+      await expect(
+        service.findIdBySlugOrFail('how-to-train-your-dragon'),
+      ).resolves.toBe('article-1');
+
+      expect(articlesRepositoryMock.findOne).toHaveBeenCalledWith({
+        where: { slug: 'how-to-train-your-dragon' },
+        select: { id: true },
+      });
+    });
+
+    it('rejects an unknown slug the same way', async () => {
+      await expect(service.findIdBySlugOrFail('nope')).rejects.toBeInstanceOf(
         NotFoundException,
       );
     });
