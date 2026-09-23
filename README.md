@@ -40,6 +40,9 @@
 | DELETE | `/articles/:slug`            | yes      | Delete your own article (`204`)                         |
 | POST   | `/articles/:slug/favorite`   | yes      | Favorite an article (idempotent)                        |
 | DELETE | `/articles/:slug/favorite`   | yes      | Unfavorite an article (idempotent)                      |
+| POST   | `/articles/:slug/comments`   | yes      | Add a comment to an article                             |
+| GET    | `/articles/:slug/comments`   | optional | List the comments on an article, oldest first, paged    |
+| DELETE | `/articles/:slug/comments/:id` | yes    | Delete your own comment (`204`)                         |
 | GET    | `/attachments/:id`           | yes      | Download a stored file, e.g. an avatar                  |
 | GET    | `/api`                       | —        | Swagger UI                                              |
 | GET    | `/api-json`                  | —        | Raw OpenAPI JSON document                               |
@@ -111,6 +114,19 @@ curl -X DELETE http://localhost:3000/articles/how-to-train-your-dragon -H "Autho
 # Favorite and unfavorite
 curl -X POST   http://localhost:3000/articles/how-to-train-your-dragon/favorite -H "Authorization: Token $TOKEN"
 curl -X DELETE http://localhost:3000/articles/how-to-train-your-dragon/favorite -H "Authorization: Token $TOKEN"
+
+# Comment on an article - the comment id comes back in the response
+curl -X POST http://localhost:3000/articles/how-to-train-your-dragon/comments \
+  -H "Authorization: Token $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"comment":{"body":"His name was my name too."}}'
+
+# Read the thread, oldest first, and page it
+curl http://localhost:3000/articles/how-to-train-your-dragon/comments
+curl 'http://localhost:3000/articles/how-to-train-your-dragon/comments?limit=20&offset=0'
+
+# Delete a comment you wrote
+curl -X DELETE http://localhost:3000/articles/how-to-train-your-dragon/comments/$COMMENT_ID \
+  -H "Authorization: Token $TOKEN"
 ```
 
 ### How logout works
@@ -248,6 +264,14 @@ src/
 │   ├── dto/                   # Article envelope, create/update, list filters
 │   ├── interfaces/            # ArticleViewFlags
 │   └── entities/              # Article, Tag, ArticleFavorite
+├── comments/
+│   ├── comments.controller.ts # Add / list / delete under /articles/:slug
+│   ├── comments.service.ts    # Comment reads and writes, ownership rule
+│   ├── comment-view.service.ts # Batches the per-page, per-viewer fields
+│   ├── comments.constants.ts  # Body limit and the id path-param descriptor
+│   ├── dto/                   # Comment envelope, create payload
+│   ├── interfaces/            # CommentViewFlags
+│   └── entities/              # Comment
 ├── attachments/
 │   ├── attachments.controller.ts   # GET /attachments/:id (authenticated)
 │   ├── attachments.service.ts      # Stores/replaces files, read policies
@@ -268,6 +292,7 @@ src/
 ├── common/
 │   ├── constants/languages.ts # Supported languages (single source of truth)
 │   ├── constants/pagination.ts # Page-size bounds shared by list endpoints
+│   ├── page-bounds.ts         # limit/offset -> take/skip, with the defaults
 │   ├── decorators/            # @CurrentUser()
 │   ├── dto/lang-query.dto.ts  # Base query DTO allowing ?lang / ?l
 │   ├── dto/pagination-query.dto.ts # Base query DTO adding limit / offset
@@ -283,5 +308,5 @@ src/
 │   └── swagger.ts             # OpenAPI document
 ├── dto/                       # Hello / health DTOs
 └── i18n/{en,jp}/              # Translation files (common, validation, auth,
-                               #   profile, attachment)
+                               #   profile, attachment, article, comment)
 ```

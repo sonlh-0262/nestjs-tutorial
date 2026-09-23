@@ -125,6 +125,14 @@ describe('FollowsService', () => {
       expect(repositoryMock.find).not.toHaveBeenCalled();
     });
 
+    it('does not query for an anonymous viewer', async () => {
+      await expect(
+        service.followingAmong(undefined, ['b', 'c']),
+      ).resolves.toEqual(new Set());
+
+      expect(repositoryMock.find).not.toHaveBeenCalled();
+    });
+
     it('answers for a whole batch in one query', async () => {
       repositoryMock.find.mockResolvedValue([{ followingId: 'c' }]);
 

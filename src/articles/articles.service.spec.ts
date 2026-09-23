@@ -12,7 +12,6 @@ import { DEFAULT_PAGE_LIMIT } from '../common/constants/pagination';
 import { PG_UNIQUE_VIOLATION } from '../database/database.constants';
 import { UserFollow } from '../users/entities/user-follow.entity';
 import { User } from '../users/entities/user.entity';
-import { UsersService } from '../users/users.service';
 import { ArticleViewService } from './article-view.service';
 import { SLUG_ATTEMPT_LIMIT } from './articles.constants';
 import { ArticlesService } from './articles.service';
@@ -58,9 +57,9 @@ describe('ArticlesService', () => {
   const getManyAndCountMock = jest.fn().mockResolvedValue([[], 0]);
 
   type BuilderMock = Record<
-    | 'innerJoinAndSelect'
-    | 'leftJoinAndSelect'
     | 'innerJoin'
+    | 'leftJoin'
+    | 'select'
     | 'andWhere'
     | 'orderBy'
     | 'addOrderBy'
@@ -71,9 +70,9 @@ describe('ArticlesService', () => {
   >;
 
   const builderMock: BuilderMock = {
-    innerJoinAndSelect: jest.fn(() => builderMock),
-    leftJoinAndSelect: jest.fn(() => builderMock),
     innerJoin: jest.fn(() => builderMock),
+    leftJoin: jest.fn(() => builderMock),
+    select: jest.fn(() => builderMock),
     andWhere: jest.fn(() => builderMock),
     orderBy: jest.fn(() => builderMock),
     addOrderBy: jest.fn(() => builderMock),
@@ -105,10 +104,6 @@ describe('ArticlesService', () => {
     ),
   };
 
-  const usersServiceMock = {
-    findByUsername: jest.fn().mockResolvedValue(null),
-  };
-
   const tagsServiceMock = { resolve: jest.fn().mockResolvedValue([]) };
 
   const favoritesServiceMock = {
@@ -117,8 +112,10 @@ describe('ArticlesService', () => {
   };
 
   const viewMock = {
-    one: jest.fn((article: Article) => Promise.resolve({ article })),
-    page: jest.fn((articles: Article[], articlesCount: number) =>
+    toArticleResponse: jest.fn((article: Article) =>
+      Promise.resolve({ article }),
+    ),
+    toArticlesResponse: jest.fn((articles: Article[], articlesCount: number) =>
       Promise.resolve({ articles, articlesCount }),
     ),
   };
@@ -133,7 +130,6 @@ describe('ArticlesService', () => {
           provide: getRepositoryToken(Article),
           useValue: articlesRepositoryMock,
         },
-        { provide: UsersService, useValue: usersServiceMock },
         { provide: TagsService, useValue: tagsServiceMock },
         { provide: FavoritesService, useValue: favoritesServiceMock },
         { provide: ArticleViewService, useValue: viewMock },
@@ -149,7 +145,6 @@ describe('ArticlesService', () => {
     jest.clearAllMocks();
     getManyAndCountMock.mockResolvedValue([[], 0]);
     articlesRepositoryMock.findOne.mockResolvedValue(null);
-    usersServiceMock.findByUsername.mockResolvedValue(null);
     tagsServiceMock.resolve.mockResolvedValue([]);
     transactionRepositoryMock.save.mockImplementation((input: Article) =>
       Promise.resolve(input),
@@ -262,7 +257,7 @@ describe('ArticlesService', () => {
         body: 'b',
       });
 
-      expect(viewMock.one).toHaveBeenCalledWith(
+      expect(viewMock.toArticleResponse).toHaveBeenCalledWith(
         expect.objectContaining({ author }),
         author,
       );
@@ -305,48 +300,48 @@ describe('ArticlesService', () => {
       );
     });
 
-    it('resolves an author filter to an id before querying', async () => {
-      usersServiceMock.findByUsername.mockResolvedValue(author);
-
+    it('filters on the author alias already joined by the base query', async () => {
       await service.list({ author: 'jake' });
 
       expect(builderMock.andWhere).toHaveBeenCalledWith(
-        'article.authorId = :authorId',
-        { authorId: 'jake-id' },
+        'author.username = :author',
+        { author: 'jake' },
       );
     });
 
-    it('joins article_favorites for a favorited filter', async () => {
-      usersServiceMock.findByUsername.mockResolvedValue(author);
-
+    it('joins article_favorites and users for a favorited filter', async () => {
       await service.list({ favorited: 'jake' });
 
       expect(builderMock.innerJoin).toHaveBeenCalledWith(
         ArticleFavorite,
         'filterFavorite',
-        expect.stringContaining('filterFavorite.userId = :favoritedById'),
-        { favoritedById: 'jake-id' },
+        'filterFavorite.articleId = article.id',
+      );
+      expect(builderMock.innerJoin).toHaveBeenCalledWith(
+        User,
+        'filterFavoriter',
+        expect.stringContaining('filterFavoriter.username = :favorited'),
+        { favorited: 'jake' },
       );
     });
 
-    it('returns an empty page for an author nobody has, without querying', async () => {
+    it('lets the join decide a username nobody has, with no extra query', async () => {
       const response = await service.list({ author: 'ghost' });
 
       expect(response).toEqual({ articles: [], articlesCount: 0 });
-      expect(articlesRepositoryMock.createQueryBuilder).not.toHaveBeenCalled();
+      expect(articlesRepositoryMock.createQueryBuilder).toHaveBeenCalledTimes(
+        1,
+      );
     });
 
-    it('returns an empty page for a favorited username nobody has', async () => {
-      const response = await service.list({ favorited: 'ghost' });
+    it('combines every filter on one builder', async () => {
+      await service.list({ tag: 'dragons', author: 'jake', favorited: 'bob' });
 
-      expect(response).toEqual({ articles: [], articlesCount: 0 });
-      expect(articlesRepositoryMock.createQueryBuilder).not.toHaveBeenCalled();
-    });
-
-    it('does not look up users when no username filter is sent', async () => {
-      await service.list({ tag: 'dragons' });
-
-      expect(usersServiceMock.findByUsername).not.toHaveBeenCalled();
+      expect(articlesRepositoryMock.createQueryBuilder).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(builderMock.innerJoin).toHaveBeenCalledTimes(4);
+      expect(builderMock.andWhere).toHaveBeenCalledTimes(1);
     });
 
     it('reports the unpaginated total', async () => {
@@ -385,14 +380,60 @@ describe('ArticlesService', () => {
 
       await service.getBySlug('how-to-train-your-dragon');
 
-      expect(articlesRepositoryMock.findOne).toHaveBeenCalledWith({
-        where: { slug: 'how-to-train-your-dragon' },
-        relations: { author: true, tags: true },
-      });
+      expect(articlesRepositoryMock.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { slug: 'how-to-train-your-dragon' },
+          relations: { author: true, tags: true },
+        }),
+      );
+    });
+
+    it('selects only the columns the response renders', async () => {
+      articlesRepositoryMock.findOne.mockResolvedValue(buildArticle());
+
+      await service.getBySlug('how-to-train-your-dragon');
+
+      expect(articlesRepositoryMock.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            description: true,
+            body: true,
+            authorId: true,
+            createdAt: true,
+            updatedAt: true,
+            author: { id: true, username: true, bio: true, image: true },
+            tags: { id: true, name: true },
+          },
+        }),
+      );
     });
 
     it('rejects an unknown slug', async () => {
       await expect(service.getBySlug('nope')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('findIdBySlugOrFail', () => {
+    it('reads the id alone, with no relations', async () => {
+      articlesRepositoryMock.findOne.mockResolvedValue({ id: 'article-1' });
+
+      await expect(
+        service.findIdBySlugOrFail('how-to-train-your-dragon'),
+      ).resolves.toBe('article-1');
+
+      expect(articlesRepositoryMock.findOne).toHaveBeenCalledWith({
+        where: { slug: 'how-to-train-your-dragon' },
+        select: { id: true },
+      });
+    });
+
+    it('rejects an unknown slug the same way', async () => {
+      await expect(service.findIdBySlugOrFail('nope')).rejects.toBeInstanceOf(
         NotFoundException,
       );
     });

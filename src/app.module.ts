@@ -13,6 +13,7 @@ import { AppService } from './app.service';
 import { ArticlesModule } from './articles/articles.module';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { AuthModule } from './auth/auth.module';
+import { CommentsModule } from './comments/comments.module';
 import {
   LANGUAGE_FALLBACKS,
   LANGUAGE_HEADER,
@@ -81,6 +82,7 @@ import { UsersModule } from './users/users.module';
     AttachmentsModule,
     ProfilesModule,
     ArticlesModule,
+    CommentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

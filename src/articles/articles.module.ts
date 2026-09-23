@@ -23,5 +23,6 @@ import { TagsService } from './tags.service';
     FavoritesService,
     TagsService,
   ],
+  exports: [ArticlesService],
 })
 export class ArticlesModule {}

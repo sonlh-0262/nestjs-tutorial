@@ -34,13 +34,12 @@ import {
 } from '../common/decorators/current-user.decorator';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { User } from '../users/entities/user.entity';
+import { SLUG_PARAM } from './articles.constants';
 import { ArticlesService } from './articles.service';
 import { ArticleResponseDto, ArticlesResponseDto } from './dto/article.dto';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { ListArticlesQueryDto } from './dto/list-articles-query.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
-
-const SLUG_PARAM = { name: 'slug', example: 'how-to-train-your-dragon' };
 
 @ApiTags('Articles')
 @Controller('articles')

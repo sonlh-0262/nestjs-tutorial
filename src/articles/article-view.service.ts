@@ -11,8 +11,6 @@ import {
 import { Article } from './entities/article.entity';
 import { FavoritesService } from './favorites.service';
 
-const NO_MATCHES: ReadonlySet<string> = new Set<string>();
-
 @Injectable()
 export class ArticleViewService {
   constructor(
@@ -20,21 +18,27 @@ export class ArticleViewService {
     private readonly followsService: FollowsService,
   ) {}
 
-  async one(article: Article, viewer?: User): Promise<ArticleResponseDto> {
-    const [dto] = await this.render([article], viewer);
+  async toArticleResponse(
+    article: Article,
+    viewer?: User,
+  ): Promise<ArticleResponseDto> {
+    const [dto] = await this.toDtosWithViewerFlags([article], viewer);
 
     return { article: dto };
   }
 
-  async page(
+  async toArticlesResponse(
     articles: Article[],
     articlesCount: number,
     viewer?: User,
   ): Promise<ArticlesResponseDto> {
-    return { articles: await this.render(articles, viewer), articlesCount };
+    return {
+      articles: await this.toDtosWithViewerFlags(articles, viewer),
+      articlesCount,
+    };
   }
 
-  private async render(
+  private async toDtosWithViewerFlags(
     articles: Article[],
     viewer?: User,
   ): Promise<ArticleDto[]> {
@@ -47,12 +51,8 @@ export class ArticleViewService {
 
     const [favoritesCounts, favorited, following] = await Promise.all([
       this.favoritesService.countsFor(articleIds),
-      viewer
-        ? this.favoritesService.favoritedBy(viewer.id, articleIds)
-        : NO_MATCHES,
-      viewer
-        ? this.followsService.followingAmong(viewer.id, authorIds)
-        : NO_MATCHES,
+      this.favoritesService.favoritedBy(viewer?.id, articleIds),
+      this.followsService.followingAmong(viewer?.id, authorIds),
     ]);
 
     return articles.map((article) =>

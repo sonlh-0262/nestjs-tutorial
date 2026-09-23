@@ -9,17 +9,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { I18nService } from 'nestjs-i18n';
 import { DataSource, Repository, SelectQueryBuilder } from 'typeorm';
 
-import {
-  DEFAULT_PAGE_LIMIT,
-  DEFAULT_PAGE_OFFSET,
-} from '../common/constants/pagination';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { pageBounds } from '../common/page-bounds';
 import { isUniqueViolation } from '../database/is-unique-violation';
 import { UserFollow } from '../users/entities/user-follow.entity';
 import { User } from '../users/entities/user.entity';
-import { UsersService } from '../users/users.service';
 import { ArticleViewService } from './article-view.service';
-import { SLUG_ATTEMPT_LIMIT } from './articles.constants';
+import { LIST_COLUMNS, SLUG_ATTEMPT_LIMIT } from './articles.constants';
 import { ArticleResponseDto, ArticlesResponseDto } from './dto/article.dto';
 import { CreateArticleBodyDto } from './dto/create-article.dto';
 import { ListArticlesQueryDto } from './dto/list-articles-query.dto';
@@ -30,8 +26,6 @@ import { FavoritesService } from './favorites.service';
 import { slugCandidate } from './slug';
 import { TagsService } from './tags.service';
 
-const NO_SUCH_USER = null;
-
 @Injectable()
 export class ArticlesService {
   private readonly logger = new Logger(ArticlesService.name);
@@ -39,7 +33,6 @@ export class ArticlesService {
   constructor(
     @InjectRepository(Article)
     private readonly articlesRepository: Repository<Article>,
-    private readonly usersService: UsersService,
     private readonly tagsService: TagsService,
     private readonly favoritesService: FavoritesService,
     private readonly view: ArticleViewService,
@@ -74,22 +67,13 @@ export class ArticlesService {
 
     this.logger.log(`Created article ${article.slug} by ${author.username}`);
 
-    return this.view.one(article, author);
+    return this.view.toArticleResponse(article, author);
   }
 
   async list(
     query: ListArticlesQueryDto,
     viewer?: User,
   ): Promise<ArticlesResponseDto> {
-    const [authorId, favoritedById] = await Promise.all([
-      this.resolveUserId(query.author),
-      this.resolveUserId(query.favorited),
-    ]);
-
-    if (authorId === NO_SUCH_USER || favoritedById === NO_SUCH_USER) {
-      return this.view.page([], 0, viewer);
-    }
-
     const builder = this.baseQuery();
 
     if (query.tag) {
@@ -98,17 +82,23 @@ export class ArticlesService {
       });
     }
 
-    if (authorId) {
-      builder.andWhere('article.authorId = :authorId', { authorId });
+    if (query.author) {
+      builder.andWhere('author.username = :author', { author: query.author });
     }
 
-    if (favoritedById) {
-      builder.innerJoin(
-        ArticleFavorite,
-        'filterFavorite',
-        'filterFavorite.articleId = article.id AND filterFavorite.userId = :favoritedById',
-        { favoritedById },
-      );
+    if (query.favorited) {
+      builder
+        .innerJoin(
+          ArticleFavorite,
+          'filterFavorite',
+          'filterFavorite.articleId = article.id',
+        )
+        .innerJoin(
+          User,
+          'filterFavoriter',
+          'filterFavoriter.id = filterFavorite.userId AND filterFavoriter.username = :favorited',
+          { favorited: query.favorited },
+        );
     }
 
     return this.paginate(builder, query, viewer);
@@ -129,7 +119,42 @@ export class ArticlesService {
   }
 
   async getBySlug(slug: string, viewer?: User): Promise<ArticleResponseDto> {
-    return this.view.one(await this.findOrFail(slug), viewer);
+    return this.view.toArticleResponse(
+      await this.findBySlugOrFail(slug),
+      viewer,
+    );
+  }
+
+  async findBySlugOrFail(slug: string): Promise<Article> {
+    return this.orFail(
+      await this.articlesRepository.findOne({
+        where: { slug },
+        relations: { author: true, tags: true },
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          description: true,
+          body: true,
+          authorId: true,
+          createdAt: true,
+          updatedAt: true,
+          author: { id: true, username: true, bio: true, image: true },
+          tags: { id: true, name: true },
+        },
+      }),
+    );
+  }
+
+  async findIdBySlugOrFail(slug: string): Promise<string> {
+    const article = this.orFail(
+      await this.articlesRepository.findOne({
+        where: { slug },
+        select: { id: true },
+      }),
+    );
+
+    return article.id;
   }
 
   async update(
@@ -137,7 +162,7 @@ export class ArticlesService {
     author: User,
     input: UpdateArticleBodyDto,
   ): Promise<ArticleResponseDto> {
-    const article = await this.findOrFail(slug);
+    const article = await this.findBySlugOrFail(slug);
 
     this.assertAuthor(article, author);
 
@@ -150,7 +175,7 @@ export class ArticlesService {
     };
 
     if (Object.keys(changes).length === 0) {
-      return this.view.one(article, author);
+      return this.view.toArticleResponse(article, author);
     }
 
     const updated =
@@ -162,11 +187,11 @@ export class ArticlesService {
 
     this.logger.log(`Updated article ${updated.slug}`);
 
-    return this.view.one(updated, author);
+    return this.view.toArticleResponse(updated, author);
   }
 
   async remove(slug: string, author: User): Promise<void> {
-    const article = await this.findOrFail(slug);
+    const article = await this.findBySlugOrFail(slug);
 
     this.assertAuthor(article, author);
 
@@ -176,26 +201,27 @@ export class ArticlesService {
   }
 
   async favorite(slug: string, viewer: User): Promise<ArticleResponseDto> {
-    const article = await this.findOrFail(slug);
+    const article = await this.findBySlugOrFail(slug);
 
     await this.favoritesService.favorite(viewer.id, article.id);
 
-    return this.view.one(article, viewer);
+    return this.view.toArticleResponse(article, viewer);
   }
 
   async unfavorite(slug: string, viewer: User): Promise<ArticleResponseDto> {
-    const article = await this.findOrFail(slug);
+    const article = await this.findBySlugOrFail(slug);
 
     await this.favoritesService.unfavorite(viewer.id, article.id);
 
-    return this.view.one(article, viewer);
+    return this.view.toArticleResponse(article, viewer);
   }
 
   private baseQuery(): SelectQueryBuilder<Article> {
     return this.articlesRepository
       .createQueryBuilder('article')
-      .innerJoinAndSelect('article.author', 'author')
-      .leftJoinAndSelect('article.tags', 'tag')
+      .innerJoin('article.author', 'author')
+      .leftJoin('article.tags', 'tag')
+      .select(LIST_COLUMNS)
       .orderBy('article.createdAt', 'DESC')
       .addOrderBy('article.id', 'DESC');
   }
@@ -205,32 +231,17 @@ export class ArticlesService {
     pagination: PaginationQueryDto,
     viewer?: User,
   ): Promise<ArticlesResponseDto> {
+    const { take, skip } = pageBounds(pagination);
+
     const [articles, total] = await builder
-      .take(pagination.limit ?? DEFAULT_PAGE_LIMIT)
-      .skip(pagination.offset ?? DEFAULT_PAGE_OFFSET)
+      .take(take)
+      .skip(skip)
       .getManyAndCount();
 
-    return this.view.page(articles, total, viewer);
+    return this.view.toArticlesResponse(articles, total, viewer);
   }
 
-  private async resolveUserId(
-    username?: string,
-  ): Promise<string | null | undefined> {
-    if (username === undefined) {
-      return undefined;
-    }
-
-    const user = await this.usersService.findByUsername(username);
-
-    return user?.id ?? NO_SUCH_USER;
-  }
-
-  private async findOrFail(slug: string): Promise<Article> {
-    const article = await this.articlesRepository.findOne({
-      where: { slug },
-      relations: { author: true, tags: true },
-    });
-
+  private orFail(article: Article | null): Article {
     if (!article) {
       throw new NotFoundException(this.i18n.t('article.NOT_FOUND'));
     }
@@ -267,6 +278,6 @@ export class ArticlesService {
   ): Promise<Article> {
     await this.articlesRepository.update({ id: article.id }, changes);
 
-    return this.findOrFail(changes.slug ?? article.slug);
+    return this.findBySlugOrFail(changes.slug ?? article.slug);
   }
 }
