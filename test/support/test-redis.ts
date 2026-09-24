@@ -3,12 +3,7 @@ import Redis from 'ioredis';
 import { RedisConfig } from '../../src/config/redis.config';
 import { TEST_REDIS_KEY_PREFIX_MARKER } from './test.constants';
 
-/**
- * Refuses to run against a Redis the suite has no claim on.
- *
- * The prefix is the thing checked because the prefix is the thing that bounds
- * what `clearRedis()` deletes - see below.
- */
+/** The prefix is what is checked because it is what bounds `clearRedis()`. */
 export function assertTestRedis(config: RedisConfig): void {
   if (config.keyPrefix.includes(TEST_REDIS_KEY_PREFIX_MARKER)) {
     return;
@@ -23,20 +18,15 @@ export function assertTestRedis(config: RedisConfig): void {
 }
 
 /**
- * Drops the revoked-token denylist between test cases.
+ * Drops the revoked-token denylist, so a `jti` revoked by a logout case does
+ * not outlive it.
  *
- * Without it a token revoked by a logout case stays revoked for as long as
- * Redis keeps the key, and the next case to reuse that `jti` fails for a reason
- * that is not in its own body.
+ * By prefix rather than `FLUSHDB`, which would empty the whole logical database
+ * - wider than what `assertTestRedis()` checks.
  *
- * `FLUSHDB` would be one round trip instead of two, but it empties the whole
- * logical database - which the key prefix does not describe. Deleting by prefix
- * keeps the blast radius equal to what `assertTestRedis()` actually checks.
- *
- * The two `keyPrefix` adjustments are not symmetrical, and ioredis is the
- * reason: it prefixes arguments a command declares as keys, and `KEYS` declares
- * none. So the pattern has to carry the prefix, the names come back carrying
- * it, and `DEL` - which does declare keys - has to be handed them without it.
+ * The prefix is added on the way in and stripped on the way out because ioredis
+ * only prefixes arguments a command declares as keys: `KEYS` declares none,
+ * `DEL` does.
  */
 export async function clearRedis(
   redis: Redis,

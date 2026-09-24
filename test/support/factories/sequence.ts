@@ -1,15 +1,11 @@
 let counter = 0;
 
 /**
- * A process-wide counter for the values factories must keep unique:
- * `users.email`, `users.username` and `articles.slug` all carry unique indexes,
- * and the suite seeds hundreds of rows per file.
+ * Keeps the unique-indexed columns (`users.email`, `users.username`,
+ * `articles.slug`) distinct.
  *
- * A counter rather than a random suffix because it survives into failure
- * messages: `user-7` and `user-8` say which rows a failing case created and in
- * what order, where two uuids say nothing. It deliberately does not reset
- * between test cases - `clearDatabase()` empties the tables, so a value can only
- * collide with one from the same case.
+ * A counter rather than a uuid because it reaches failure messages: `user-7`
+ * and `user-8` say which rows a case created and in what order.
  */
 export function nextSequence(): number {
   counter += 1;

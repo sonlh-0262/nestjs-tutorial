@@ -379,6 +379,15 @@ describe('Articles (e2e)', () => {
       expect(response.body).toEqual({ articles: [], articlesCount: 0 });
     });
 
+    it('returns an empty page for a favoriter nobody has', async () => {
+      const response = await request(server())
+        .get('/articles')
+        .query({ favorited: 'nobody-at-all' })
+        .expect(200);
+
+      expect(response.body).toEqual({ articles: [], articlesCount: 0 });
+    });
+
     it('reports the caller relationships when a token is sent', async () => {
       const { token: authorToken, username: authorName } = await register();
       const { token: readerToken } = await register();
@@ -439,6 +448,17 @@ describe('Articles (e2e)', () => {
       await request(server())
         .get('/articles')
         .query({ limit: MAX_PAGE_LIMIT + 1 })
+        .expect(400);
+    });
+
+    it('rejects a limit of zero', async () => {
+      await request(server()).get('/articles').query({ limit: 0 }).expect(400);
+    });
+
+    it('rejects a negative offset', async () => {
+      await request(server())
+        .get('/articles')
+        .query({ offset: -1 })
         .expect(400);
     });
 

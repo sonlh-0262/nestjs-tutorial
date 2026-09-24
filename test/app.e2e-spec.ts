@@ -181,6 +181,13 @@ describe('AppController (e2e)', () => {
   });
 
   describe('swagger', () => {
+    it('serves the UI', async () => {
+      await request(ctx.server())
+        .get('/api')
+        .expect(200)
+        .expect('Content-Type', /text\/html/);
+    });
+
     it('serves the OpenAPI JSON document', async () => {
       const response = await request(ctx.server()).get('/api-json').expect(200);
 

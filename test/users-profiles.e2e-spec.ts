@@ -211,6 +211,24 @@ describe('User, profiles and attachments (e2e)', () => {
       expect((response.body as UserEnvelope).user.bio).toBeNull();
     });
 
+    it('clears the image when sent null', async () => {
+      const { token } = await register();
+
+      await request(ctx.server())
+        .put('/user')
+        .set('Authorization', `Token ${token}`)
+        .send({ user: { image: 'https://example.com/a.png' } })
+        .expect(200);
+
+      const response = await request(ctx.server())
+        .put('/user')
+        .set('Authorization', `Token ${token}`)
+        .send({ user: { image: null } })
+        .expect(200);
+
+      expect((response.body as UserEnvelope).user.image).toBeNull();
+    });
+
     it('accepts an empty update and changes nothing', async () => {
       const { credentials, token } = await register();
 
@@ -707,6 +725,39 @@ describe('User, profiles and attachments (e2e)', () => {
         .set('Authorization', `Token ${token}`)
         .expect(400);
     });
+
+    /**
+     * The deny-by-default branch of `READ_POLICIES`: a type with no entry is
+     * refused. The upload endpoint only ever writes `User`, so seeding the row
+     * is the only way to reach it.
+     */
+    it('refuses an attachment whose type has no read policy', async () => {
+      const owner = await ctx.factories.users.createAuthenticated();
+      const attachment = await ctx.factories.attachments.create(owner.user, {
+        attachableType: 'Article' as never,
+      });
+
+      await request(ctx.server())
+        .get(`/attachments/${attachment.id}`)
+        .set('Authorization', `Token ${owner.token}`)
+        .expect(403);
+    });
+
+    it('answers 404 when the row survives but the file does not', async () => {
+      const { token } = await register();
+      const url = await uploadAvatar(token);
+
+      const row = await ctx.dataSource
+        .getRepository(Attachment)
+        .findOneByOrFail({ id: attachmentIdOf(url) });
+
+      await storage.remove(row.storagePath);
+
+      await request(ctx.server())
+        .get(url)
+        .set('Authorization', `Token ${token}`)
+        .expect(404);
+    });
   });
 
   describe('GET /profiles/:username', () => {
@@ -1070,6 +1121,23 @@ describe('User, profiles and attachments (e2e)', () => {
 
       expect(names).toContain('CreateAttachmentsTable1758000000000');
       expect(names).toContain('CreateUserFollowsTable1758000100000');
+    });
+
+    /**
+     * The one relation that does not cascade, on purpose: `attachments` is
+     * polymorphic, so `attachable_id` cannot carry a foreign key. Nothing
+     * deletes a user through the API today, so there is no live leak - but a
+     * future `DELETE /user` will have to discard attachments itself.
+     */
+    it('leaves attachment rows behind when their owner is deleted', async () => {
+      const owner = await ctx.factories.users.create();
+      const attachment = await ctx.factories.attachments.create(owner);
+
+      await ctx.dataSource.getRepository(User).delete({ id: owner.id });
+
+      await expect(
+        ctx.dataSource.getRepository(Attachment).countBy({ id: attachment.id }),
+      ).resolves.toBe(1);
     });
 
     it('refuses a self-follow even when inserted directly', async () => {

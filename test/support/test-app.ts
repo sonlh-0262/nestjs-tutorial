@@ -27,16 +27,11 @@ import { assertTestRedis, clearRedis } from './test-redis';
 import { assertTestUploadDir, clearUploads } from './test-storage';
 
 /**
- * Boots the application the way `main.ts` does and hands back everything a
- * spec file needs to drive it.
+ * Boots the application exactly as `main.ts` does - one shared bootstrap, so a
+ * spec can never drive an app configured differently from the real one.
  *
- * Every spec file used to repeat this: compile the testing module, read the app
- * config, call `configureApp`, init, then remember the `DataSource`. Five
- * copies meant five chances to configure a test app that no longer matches the
- * one in production - and the whole point of an e2e test is that it does.
- *
- * One app per spec file rather than one per test case: booting costs seconds
- * and opens a connection pool, while `reset()` costs three round trips.
+ * One app per spec file, not per case: booting costs seconds and a connection
+ * pool, while `reset()` costs three round trips.
  */
 export async function createTestApp(
   options: TestAppOptions = {},
@@ -51,9 +46,7 @@ export async function createTestApp(
   const redisConfig = config.getOrThrow<RedisConfig>(REDIS_CONFIG_KEY);
   const storageConfig = config.getOrThrow<StorageConfig>(STORAGE_CONFIG_KEY);
 
-  // Before `init()`, so a misconfigured run fails with an explanation rather
-  // than by emptying a database somebody was using. One rail per store the
-  // suite wipes.
+  // Before `init()`: one rail per store `reset()` wipes.
   assertTestDatabase(config.getOrThrow<DatabaseConfig>(DATABASE_CONFIG_KEY));
   assertTestRedis(redisConfig);
   assertTestUploadDir(storageConfig);

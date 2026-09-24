@@ -14,29 +14,13 @@ import { TestContext } from './support/interfaces/test-context.interface';
 import { createTestApp } from './support/test-app';
 
 /**
- * `CommentsController` at C2 - condition coverage.
+ * `CommentsController` at C2 - every condition inside every decision taken both
+ * ways, where C1 would be satisfied by one 201 and one 401 per handler.
  *
- * C0 asks that every statement run, C1 that every decision go both ways, C2
- * that every *condition inside* a decision go both ways. The three handlers
- * here reach a decision through four layers, and C1 would be satisfied by one
- * 401 and one 201 per handler while leaving most of those layers untested:
- *
- *   guard      header absent / present-but-invalid / revoked / subject gone
- *   pipe       `:id` parses as a uuid or does not
- *   DTO        each `@Is…` on `body`, plus the whitelist
- *   service    article found, comment found, comment on *this* article, author
- *
- * So the cases below are grouped by decision, and each group walks its
- * conditions one at a time with everything else held valid - the failing case
- * then names the condition that produced it. `expected 404, got 403` is worth
- * more than a red line in a test called "deletes a comment".
- *
- * The ordering and paging cases lean on `factories.comments.createThread()`,
- * which backdates rows a second apart. Comments come back ordered by
- * `created_at` with the random `id` as the tiebreak, so rows written at full
- * speed through the endpoint would come back in an unpredictable order and
- * every assertion here would be flaky for reasons that have nothing to do with
- * the code under test.
+ * A request passes four layers of decisions, so the cases are grouped by layer
+ * - guard, pipe, DTO, service - and each group varies one condition with the
+ * rest held valid. A failure then names the condition: `expected 404, got 403`
+ * says the ownership check ran before the article check.
  */
 
 interface CommentBody {
@@ -168,21 +152,15 @@ describe('CommentsController (e2e)', () => {
       });
 
       /**
-       * Pinned, not endorsed. This case was written expecting a 400 and got a
-       * 201, which is the finding rather than the bug in the test.
+       * Pinned, not endorsed - this case expected a 400 and got a 201.
        *
-       * `configureApp` turns on `transformOptions: { enableImplicitConversion:
-       * true }`. The query DTOs need it - `?limit=5` arrives as a string and
-       * `@IsInt` has to see a number - but class-transformer applies the same
-       * rule to body fields, where JSON already carries the type. So `42` is
-       * converted to `'42'` before `@IsString()` on `CreateCommentBodyDto.body`
-       * ever runs, and that decorator cannot reject anything.
+       * `configureApp` enables `enableImplicitConversion`, which the query DTOs
+       * need (`?limit=5` is a string, `@IsInt` needs a number). It applies to
+       * body fields too, before validation, so `42` becomes `'42'` and
+       * `@IsString()` on `CreateCommentBodyDto.body` can reject nothing.
        *
-       * Not fixed here: switching implicit conversion off changes how every
-       * endpoint in the application validates, and that is not a change to make
-       * inside a testing pull. The case stays so the suite says out loud what
-       * the behaviour is, and so the day somebody does turn it off, this is the
-       * test that tells them what moved.
+       * Turning the flag off changes how every endpoint validates, so it is its
+       * own pull. This case is what will fail, and say why, when that happens.
        */
       it('coerces a numeric body to a string instead of rejecting it', async () => {
         const response = await postComment(author.token, 42).expect(201);
@@ -672,6 +650,31 @@ describe('CommentsController (e2e)', () => {
           1,
         );
       });
+    });
+  });
+
+  describe('localised messages', () => {
+    it('translates the not-found message', async () => {
+      const response = await deleteComment(randomUUID(), author.token)
+        .set('x-lang', 'jp')
+        .expect(404);
+
+      expect((response.body as { message: string }).message).toBe(
+        'この記事にそのIDのコメントは存在しません',
+      );
+    });
+
+    it('translates the forbidden message', async () => {
+      const comment = await ctx.factories.comments.create(article, author.user);
+      const stranger = await ctx.factories.users.createAuthenticated();
+
+      const response = await deleteComment(comment.id, stranger.token)
+        .set('x-lang', 'jp')
+        .expect(403);
+
+      expect((response.body as { message: string }).message).toBe(
+        '自分が書いたコメントのみ削除できます',
+      );
     });
   });
 

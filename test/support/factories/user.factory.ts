@@ -15,11 +15,8 @@ export class UserFactory {
   ) {}
 
   /**
-   * Inserts a user directly, bypassing `POST /users`.
-   *
-   * Going through the endpoint would make every test that needs an author
-   * depend on registration still working, and would turn a broken
-   * `AuthController` into a hundred red tests pointing nowhere.
+   * Inserts directly rather than through `POST /users`, so a broken
+   * `AuthController` reddens the registration tests and nothing else.
    */
   async create(overrides: DeepPartial<User> = {}): Promise<User> {
     const sequence = nextSequence();
@@ -37,9 +34,8 @@ export class UserFactory {
   }
 
   /**
-   * The same user, plus credentials. The token comes from `AuthService` rather
-   * than from a locally assembled JWT so the suite exercises the tokens the
-   * application actually issues - claims, `jti` and expiry included.
+   * The token comes from `AuthService` rather than a locally assembled JWT, so
+   * the suite drives the endpoints with the tokens the app actually issues.
    */
   async createAuthenticated(
     overrides: DeepPartial<User> = {},
