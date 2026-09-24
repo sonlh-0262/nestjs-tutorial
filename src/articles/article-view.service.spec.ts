@@ -67,7 +67,7 @@ describe('ArticleViewService', () => {
 
   describe('one', () => {
     it('renders the full article shape', async () => {
-      const { article } = await service.one(buildArticle());
+      const { article } = await service.toArticleResponse(buildArticle());
 
       expect(article).toEqual({
         slug: 'how-to-train-your-dragon',
@@ -89,7 +89,7 @@ describe('ArticleViewService', () => {
     });
 
     it('never leaks the author email or ids', async () => {
-      const { article } = await service.one(buildArticle());
+      const { article } = await service.toArticleResponse(buildArticle());
 
       expect(article).not.toHaveProperty('id');
       expect(article).not.toHaveProperty('authorId');
@@ -100,7 +100,7 @@ describe('ArticleViewService', () => {
     it('sorts the tag list', async () => {
       const tags = [{ name: 'training' }, { name: 'dragons' }];
 
-      const { article } = await service.one(
+      const { article } = await service.toArticleResponse(
         buildArticle({ tags: tags as Article['tags'] }),
       );
 
@@ -112,7 +112,7 @@ describe('ArticleViewService', () => {
         new Map([['article-1', 4]]),
       );
 
-      const { article } = await service.one(buildArticle());
+      const { article } = await service.toArticleResponse(buildArticle());
 
       expect(article.favoritesCount).toBe(4);
     });
@@ -123,14 +123,17 @@ describe('ArticleViewService', () => {
       );
       followsServiceMock.followingAmong.mockResolvedValue(new Set(['jake-id']));
 
-      const { article } = await service.one(buildArticle(), viewer);
+      const { article } = await service.toArticleResponse(
+        buildArticle(),
+        viewer,
+      );
 
       expect(article.favorited).toBe(true);
       expect(article.author.following).toBe(true);
     });
 
     it('asks the batch lookups for no viewer when anonymous', async () => {
-      await service.one(buildArticle());
+      await service.toArticleResponse(buildArticle());
 
       expect(favoritesServiceMock.favoritedBy).toHaveBeenCalledWith(undefined, [
         'article-1',
@@ -144,14 +147,14 @@ describe('ArticleViewService', () => {
 
   describe('page', () => {
     it('returns an empty page without querying', async () => {
-      const response = await service.page([], 0, viewer);
+      const response = await service.toArticlesResponse([], 0, viewer);
 
       expect(response).toEqual({ articles: [], articlesCount: 0 });
       expect(favoritesServiceMock.countsFor).not.toHaveBeenCalled();
     });
 
     it('carries the total separately from the page size', async () => {
-      const response = await service.page([buildArticle()], 42);
+      const response = await service.toArticlesResponse([buildArticle()], 42);
 
       expect(response.articles).toHaveLength(1);
       expect(response.articlesCount).toBe(42);
@@ -162,7 +165,7 @@ describe('ArticleViewService', () => {
         buildArticle({ id: `article-${index}` }),
       );
 
-      await service.page(articles, articles.length, viewer);
+      await service.toArticlesResponse(articles, articles.length, viewer);
 
       expect(favoritesServiceMock.countsFor).toHaveBeenCalledTimes(1);
       expect(favoritesServiceMock.favoritedBy).toHaveBeenCalledTimes(1);
@@ -175,7 +178,7 @@ describe('ArticleViewService', () => {
         buildArticle({ id: 'article-2' }),
       ];
 
-      await service.page(articles, 2, viewer);
+      await service.toArticlesResponse(articles, 2, viewer);
 
       expect(followsServiceMock.followingAmong).toHaveBeenCalledWith(
         'viewer-id',
@@ -191,7 +194,7 @@ describe('ArticleViewService', () => {
         new Map([['article-2', 1]]),
       );
 
-      const { articles } = await service.page(
+      const { articles } = await service.toArticlesResponse(
         [
           buildArticle({ id: 'article-1', slug: 'first' }),
           buildArticle({ id: 'article-2', slug: 'second' }),

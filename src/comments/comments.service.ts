@@ -34,12 +34,12 @@ export class CommentsService {
     author: User,
     input: CreateCommentBodyDto,
   ): Promise<CommentResponseDto> {
-    const article = await this.articlesService.findBySlugOrFail(slug);
+    const articleId = await this.articlesService.findIdBySlugOrFail(slug);
 
     const comment = await this.commentsRepository.save(
       this.commentsRepository.create({
         body: input.body,
-        articleId: article.id,
+        articleId,
         authorId: author.id,
       }),
     );
@@ -47,10 +47,10 @@ export class CommentsService {
     comment.author = author;
 
     this.logger.log(
-      `Created comment ${comment.id} on ${article.slug} by ${author.username}`,
+      `Created comment ${comment.id} on ${slug} by ${author.username}`,
     );
 
-    return this.view.one(comment, author);
+    return this.view.toCommentResponse(comment, author);
   }
 
   async list(
@@ -58,32 +58,41 @@ export class CommentsService {
     query: PaginationQueryDto,
     viewer?: User,
   ): Promise<CommentsResponseDto> {
-    const article = await this.articlesService.findBySlugOrFail(slug);
+    const articleId = await this.articlesService.findIdBySlugOrFail(slug);
 
     const [comments, total] = await this.commentsRepository.findAndCount({
-      where: { articleId: article.id },
+      where: { articleId },
       relations: { author: true },
+      select: {
+        id: true,
+        body: true,
+        authorId: true,
+        createdAt: true,
+        updatedAt: true,
+        author: { id: true, username: true, bio: true, image: true },
+      },
       order: { createdAt: 'ASC', id: 'ASC' },
       ...pageBounds(query),
     });
 
-    return this.view.page(comments, total, viewer);
+    return this.view.toCommentsResponse(comments, total, viewer);
   }
 
   async remove(slug: string, id: string, author: User): Promise<void> {
-    const article = await this.articlesService.findBySlugOrFail(slug);
-    const comment = await this.findOrFail(article.id, id);
+    const articleId = await this.articlesService.findIdBySlugOrFail(slug);
+    const comment = await this.findOrFail(articleId, id);
 
     this.assertAuthor(comment, author);
 
     await this.commentsRepository.delete({ id: comment.id });
 
-    this.logger.log(`Deleted comment ${id} on ${article.slug}`);
+    this.logger.log(`Deleted comment ${id} on ${slug}`);
   }
 
   private async findOrFail(articleId: string, id: string): Promise<Comment> {
     const comment = await this.commentsRepository.findOne({
       where: { id, articleId },
+      select: { id: true, authorId: true },
     });
 
     if (!comment) {

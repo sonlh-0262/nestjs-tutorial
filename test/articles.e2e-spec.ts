@@ -566,6 +566,33 @@ describe('Articles (e2e)', () => {
       });
     });
 
+    it('returns every tag, not just the first', async () => {
+      const { token } = await register();
+      const tags = [uniqueTag(), uniqueTag(), uniqueTag()];
+      const created = await createArticle(token, { tagList: tags });
+
+      const response = await request(server())
+        .get(`/articles/${created.slug}`)
+        .expect(200);
+
+      expect((response.body as ArticleEnvelope).article.tagList).toEqual(
+        [...tags].sort(),
+      );
+    });
+
+    it('never leaks the author email', async () => {
+      const { token } = await register();
+      const created = await createArticle(token);
+
+      const response = await request(server())
+        .get(`/articles/${created.slug}`)
+        .expect(200);
+
+      expect(
+        (response.body as ArticleEnvelope).article.author,
+      ).not.toHaveProperty('email');
+    });
+
     it('404s on an unknown slug', async () => {
       await request(server()).get('/articles/no-such-article').expect(404);
     });

@@ -15,7 +15,7 @@ import { isUniqueViolation } from '../database/is-unique-violation';
 import { UserFollow } from '../users/entities/user-follow.entity';
 import { User } from '../users/entities/user.entity';
 import { ArticleViewService } from './article-view.service';
-import { SLUG_ATTEMPT_LIMIT } from './articles.constants';
+import { LIST_COLUMNS, SLUG_ATTEMPT_LIMIT } from './articles.constants';
 import { ArticleResponseDto, ArticlesResponseDto } from './dto/article.dto';
 import { CreateArticleBodyDto } from './dto/create-article.dto';
 import { ListArticlesQueryDto } from './dto/list-articles-query.dto';
@@ -67,7 +67,7 @@ export class ArticlesService {
 
     this.logger.log(`Created article ${article.slug} by ${author.username}`);
 
-    return this.view.one(article, author);
+    return this.view.toArticleResponse(article, author);
   }
 
   async list(
@@ -119,20 +119,42 @@ export class ArticlesService {
   }
 
   async getBySlug(slug: string, viewer?: User): Promise<ArticleResponseDto> {
-    return this.view.one(await this.findBySlugOrFail(slug), viewer);
+    return this.view.toArticleResponse(
+      await this.findBySlugOrFail(slug),
+      viewer,
+    );
   }
 
   async findBySlugOrFail(slug: string): Promise<Article> {
-    const article = await this.articlesRepository.findOne({
-      where: { slug },
-      relations: { author: true, tags: true },
-    });
+    return this.orFail(
+      await this.articlesRepository.findOne({
+        where: { slug },
+        relations: { author: true, tags: true },
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          description: true,
+          body: true,
+          authorId: true,
+          createdAt: true,
+          updatedAt: true,
+          author: { id: true, username: true, bio: true, image: true },
+          tags: { id: true, name: true },
+        },
+      }),
+    );
+  }
 
-    if (!article) {
-      throw new NotFoundException(this.i18n.t('article.NOT_FOUND'));
-    }
+  async findIdBySlugOrFail(slug: string): Promise<string> {
+    const article = this.orFail(
+      await this.articlesRepository.findOne({
+        where: { slug },
+        select: { id: true },
+      }),
+    );
 
-    return article;
+    return article.id;
   }
 
   async update(
@@ -153,7 +175,7 @@ export class ArticlesService {
     };
 
     if (Object.keys(changes).length === 0) {
-      return this.view.one(article, author);
+      return this.view.toArticleResponse(article, author);
     }
 
     const updated =
@@ -165,7 +187,7 @@ export class ArticlesService {
 
     this.logger.log(`Updated article ${updated.slug}`);
 
-    return this.view.one(updated, author);
+    return this.view.toArticleResponse(updated, author);
   }
 
   async remove(slug: string, author: User): Promise<void> {
@@ -183,7 +205,7 @@ export class ArticlesService {
 
     await this.favoritesService.favorite(viewer.id, article.id);
 
-    return this.view.one(article, viewer);
+    return this.view.toArticleResponse(article, viewer);
   }
 
   async unfavorite(slug: string, viewer: User): Promise<ArticleResponseDto> {
@@ -191,14 +213,15 @@ export class ArticlesService {
 
     await this.favoritesService.unfavorite(viewer.id, article.id);
 
-    return this.view.one(article, viewer);
+    return this.view.toArticleResponse(article, viewer);
   }
 
   private baseQuery(): SelectQueryBuilder<Article> {
     return this.articlesRepository
       .createQueryBuilder('article')
-      .innerJoinAndSelect('article.author', 'author')
-      .leftJoinAndSelect('article.tags', 'tag')
+      .innerJoin('article.author', 'author')
+      .leftJoin('article.tags', 'tag')
+      .select(LIST_COLUMNS)
       .orderBy('article.createdAt', 'DESC')
       .addOrderBy('article.id', 'DESC');
   }
@@ -215,7 +238,15 @@ export class ArticlesService {
       .skip(skip)
       .getManyAndCount();
 
-    return this.view.page(articles, total, viewer);
+    return this.view.toArticlesResponse(articles, total, viewer);
+  }
+
+  private orFail(article: Article | null): Article {
+    if (!article) {
+      throw new NotFoundException(this.i18n.t('article.NOT_FOUND'));
+    }
+
+    return article;
   }
 
   private assertAuthor(article: Article, user: User): void {
